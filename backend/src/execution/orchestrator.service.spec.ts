@@ -7,6 +7,8 @@ import { Run } from '../runs/entities/run.entity';
 import { Step } from '../runs/entities/step.entity';
 import { Event } from '../runs/entities/event.entity';
 import { NotFoundException } from '@nestjs/common';
+import { AgentRuntimeService } from '../agents/agent-runtime.service';
+import { ToolRuntimeService } from '../tools/tool-runtime.service';
 
 describe('OrchestratorService', () => {
   let service: OrchestratorService;
@@ -34,6 +36,21 @@ describe('OrchestratorService', () => {
     save: jest.fn(),
   };
 
+  const mockAgentRuntimeService = {
+    runAgentStep: jest.fn().mockResolvedValue({
+      text: 'Agent response',
+      toolCalls: [],
+      finishReason: 'stop',
+    }),
+    getAgent: jest.fn(),
+  };
+
+  const mockToolRuntimeService = {
+    callTool: jest.fn().mockResolvedValue({ result: 'Tool executed' }),
+    getTool: jest.fn(),
+    getAllTools: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -53,6 +70,14 @@ describe('OrchestratorService', () => {
         {
           provide: getRepositoryToken(Event),
           useValue: mockEventRepository,
+        },
+        {
+          provide: AgentRuntimeService,
+          useValue: mockAgentRuntimeService,
+        },
+        {
+          provide: ToolRuntimeService,
+          useValue: mockToolRuntimeService,
         },
       ],
     }).compile();
