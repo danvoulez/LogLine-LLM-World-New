@@ -8,8 +8,12 @@ import { Workflow } from './workflows/entities/workflow.entity';
 import { Run } from './runs/entities/run.entity';
 import { Step } from './runs/entities/step.entity';
 import { Event } from './runs/entities/event.entity';
+import { Tool } from './tools/entities/tool.entity';
+import { Agent } from './agents/entities/agent.entity';
 import { SetupPgVectorService } from './database/setup-pgvector.service';
 import { DatabaseController } from './database/database.controller';
+import { LlmModule } from './llm/llm.module';
+import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
 function getDatabaseConfig() {
@@ -20,7 +24,7 @@ function getDatabaseConfig() {
     return {
       type: 'postgres' as const,
       url: process.env.POSTGRES_URL,
-      entities: [Workflow, Run, Step, Event],
+      entities: [Workflow, Run, Step, Event, Tool, Agent],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
       // Vercel Postgres requires SSL in production
@@ -50,7 +54,7 @@ function getDatabaseConfig() {
     username: process.env.DB_USERNAME || 'user',
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_DATABASE || 'logline',
-    entities: [Workflow, Run, Step, Event],
+    entities: [Workflow, Run, Step, Event, Tool, Agent],
     synchronize: process.env.NODE_ENV !== 'production',
     logging: process.env.NODE_ENV === 'development',
   };
@@ -59,12 +63,17 @@ function getDatabaseConfig() {
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
-      useFactory: () => getDatabaseConfig(),
-      // Don't fail app startup if DB connection fails
-      // Connection will be established on first use
+      useFactory: async () => {
+        return await getDatabaseConfig();
+      },
+      dataSourceFactory: async (options) => {
+        const dataSource = await new DataSource(options).initialize();
+        return dataSource;
+      },
     }),
     WorkflowsModule,
     RunsModule,
+    LlmModule,
   ],
   controllers: [AppController, DatabaseController],
   providers: [AppService, SetupPgVectorService],
