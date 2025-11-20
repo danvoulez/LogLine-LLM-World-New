@@ -14,21 +14,30 @@ export class SetupPgVectorService implements OnModuleInit {
     }
 
     // Wait a bit for database connection to be ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     try {
-      // Check if database is connected
+      // Initialize connection if not already initialized
       if (!this.dataSource.isInitialized) {
-        console.log('ℹ️  Database not initialized yet, skipping pgvector setup');
-        return;
+        await this.dataSource.initialize();
       }
 
-      await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS vector;');
-      console.log('✅ pgvector extension enabled');
+      // Check if extension already exists
+      const checkResult = await this.dataSource.query(
+        "SELECT * FROM pg_extension WHERE extname = 'vector';"
+      );
+
+      if (checkResult.length === 0) {
+        await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS vector;');
+        console.log('✅ pgvector extension enabled');
+      } else {
+        console.log('✅ pgvector extension already enabled');
+      }
     } catch (error) {
       // Extension might already exist, or connection not ready
       // This is fine - it will be enabled manually if needed
       console.log('ℹ️  pgvector extension check:', error.message);
+      // Don't throw - allow app to continue
     }
   }
 }

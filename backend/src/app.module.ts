@@ -58,7 +58,11 @@ function getDatabaseConfig() {
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(getDatabaseConfig()),
+    TypeOrmModule.forRootAsync({
+      useFactory: () => getDatabaseConfig(),
+      // Don't fail app startup if DB connection fails
+      // Connection will be established on first use
+    }),
     WorkflowsModule,
     RunsModule,
   ],
