@@ -8,6 +8,8 @@ import { Workflow } from './workflows/entities/workflow.entity';
 import { Run } from './runs/entities/run.entity';
 import { Step } from './runs/entities/step.entity';
 import { Event } from './runs/entities/event.entity';
+import { SetupPgVectorService } from './database/setup-pgvector.service';
+import { DatabaseController } from './database/database.controller';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
 function getDatabaseConfig() {
@@ -30,6 +32,9 @@ function getDatabaseConfig() {
         max: 10, // Maximum number of connections in pool
         connectionTimeoutMillis: 2000,
       },
+      // Enable pgvector extension on connection
+      migrations: ['dist/database/migrations/*.js'],
+      migrationsRun: false, // We'll run migrations manually or via API
     };
   }
 
@@ -53,7 +58,7 @@ function getDatabaseConfig() {
     WorkflowsModule,
     RunsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, DatabaseController],
+  providers: [AppService, SetupPgVectorService],
 })
 export class AppModule {}
