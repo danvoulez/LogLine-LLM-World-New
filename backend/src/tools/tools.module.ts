@@ -8,12 +8,14 @@ import { Event } from '../runs/entities/event.entity';
 import { SchemaValidatorService } from '../common/validators/schema-validator.service';
 import { LlmModule } from '../llm/llm.module';
 import { RunsModule } from '../runs/runs.module';
+import { AppsModule } from '../apps/apps.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tool, Event]),
     LlmModule,
     RunsModule,
+    AppsModule, // Import AppsModule to access AppScopeCheckerService
   ],
   controllers: [ToolsController],
   providers: [ToolRuntimeService, NaturalLanguageDbTool, SchemaValidatorService],

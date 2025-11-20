@@ -6,17 +6,28 @@ import { AppWorkflow } from './entities/app-workflow.entity';
 import { AppAction } from './entities/app-action.entity';
 import { AppsRuntimeController } from './apps-runtime.controller';
 import { AppsImportService } from './apps-import.service';
+import { AppScopeCheckerService } from './services/app-scope-checker.service';
+import { AppManifestValidatorService } from './validators/app-manifest-validator.service';
 import { RunsModule } from '../runs/runs.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
+import { ToolsModule } from '../tools/tools.module';
 import { Workflow } from '../workflows/entities/workflow.entity';
+import { Tool } from '../tools/entities/tool.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([App, AppScope, AppWorkflow, AppAction, Workflow]),
+    TypeOrmModule.forFeature([App, AppScope, AppWorkflow, AppAction, Workflow, Tool]),
     RunsModule,
+    WorkflowsModule,
+    ToolsModule,
   ],
   controllers: [AppsRuntimeController],
-  providers: [AppsImportService],
-  exports: [AppsImportService],
+  providers: [
+    AppsImportService,
+    AppScopeCheckerService,
+    AppManifestValidatorService,
+  ],
+  exports: [AppsImportService, AppScopeCheckerService],
 })
 export class AppsModule {}
 

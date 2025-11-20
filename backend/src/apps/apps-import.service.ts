@@ -7,6 +7,7 @@ import { AppWorkflow } from './entities/app-workflow.entity';
 import { AppAction } from './entities/app-action.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { RunMode } from '../runs/entities/run.entity';
+import { AppManifestValidatorService } from './validators/app-manifest-validator.service';
 
 interface AppManifest {
   version: string;
@@ -50,17 +51,12 @@ export class AppsImportService {
     private appActionRepository: Repository<AppAction>,
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
+    private manifestValidator: AppManifestValidatorService,
   ) {}
 
   async importManifest(manifest: AppManifest): Promise<App> {
-    // Validate manifest structure
-    if (!manifest.version || !manifest.app) {
-      throw new BadRequestException('Invalid manifest structure');
-    }
-
-    if (manifest.version !== '1.0.0') {
-      throw new BadRequestException(`Unsupported manifest version: ${manifest.version}`);
-    }
+    // Validate manifest (comprehensive validation)
+    await this.manifestValidator.validate(manifest);
 
     const appData = manifest.app;
 

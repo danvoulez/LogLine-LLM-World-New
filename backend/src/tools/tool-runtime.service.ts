@@ -7,7 +7,9 @@ import { NaturalLanguageDbTool } from './natural-language-db.tool';
 import { ToolNotFoundException } from '../common/exceptions/tool-not-found.exception';
 import { ToolExecutionException } from '../common/exceptions/tool-execution.exception';
 import { ValidationException } from '../common/exceptions/validation.exception';
+import { ScopeDeniedException } from '../common/exceptions/scope-denied.exception';
 import { SchemaValidatorService } from '../common/validators/schema-validator.service';
+import { AppScopeCheckerService } from '../apps/services/app-scope-checker.service';
 import { RetryUtil } from '../common/utils/retry.util';
 
 export interface ToolContext {
@@ -32,6 +34,7 @@ export class ToolRuntimeService {
     private eventRepository: Repository<Event>,
     private naturalLanguageDbTool: NaturalLanguageDbTool,
     private schemaValidator: SchemaValidatorService,
+    private scopeChecker: AppScopeCheckerService,
   ) {
     this.registerBuiltinTools();
   }
@@ -83,6 +86,56 @@ export class ToolRuntimeService {
     if (!tool) {
       this.logger.error(`Tool not found: ${toolId}`, undefined, logContext);
       throw new ToolNotFoundException(toolId, logContext);
+    }
+
+    // Check app scope (if app context is provided)
+    if (context.appId) {
+      const hasScope = await this.scopeChecker.checkToolScope(
+        context.appId,
+        toolId,
+      );
+
+      if (!hasScope) {
+        // Log scope check as event
+        await this.eventRepository.save({
+          run_id: context.runId,
+          step_id: context.stepId,
+          kind: EventKind.POLICY_EVAL,
+          payload: {
+            action: 'tool_call',
+            tool_id: toolId,
+            app_id: context.appId,
+            result: 'denied',
+            reason: 'scope_not_granted',
+          },
+        });
+
+        this.logger.error(
+          `Scope denied: app=${context.appId}, tool=${toolId}`,
+          undefined,
+          logContext,
+        );
+        throw new ScopeDeniedException(
+          context.appId,
+          'tool',
+          toolId,
+          logContext,
+        );
+      }
+
+      // Log successful scope check
+      await this.eventRepository.save({
+        run_id: context.runId,
+        step_id: context.stepId,
+        kind: EventKind.POLICY_EVAL,
+        payload: {
+          action: 'tool_call',
+          tool_id: toolId,
+          app_id: context.appId,
+          result: 'allowed',
+          reason: 'scope_granted',
+        },
+      });
     }
 
     // TODO: Policy check (Phase 4)
