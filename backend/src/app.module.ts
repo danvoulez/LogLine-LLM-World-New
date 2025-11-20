@@ -30,8 +30,12 @@ function getDatabaseConfig() {
       // Connection pooling for serverless
       extra: {
         max: 10, // Maximum number of connections in pool
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 5000, // Increased timeout for serverless
+        idleTimeoutMillis: 30000,
       },
+      // Don't fail on connection errors during startup
+      retryAttempts: 3,
+      retryDelay: 3000,
       // Enable pgvector extension on connection
       migrations: ['dist/database/migrations/*.js'],
       migrationsRun: false, // We'll run migrations manually or via API
