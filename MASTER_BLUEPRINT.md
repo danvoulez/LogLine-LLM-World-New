@@ -2,9 +2,15 @@
 
 > A **cloud‑native LLM-first Agent OS** + **App platform** built for Vercel deployment.
 
-**Version:** 2.1  
-**Last Updated:** 2024  
+**Version:** 2.2  
+**Last Updated:** 2024-11-20  
 **Deployment Target:** Vercel (Serverless) + Vercel Postgres
+
+**Recent Updates:**
+* ✅ JSON✯Atomic integration for structured LLM context
+* ✅ TDLN-T integration for natural language structuring
+* ✅ Dignified AI partnership implementation
+* ✅ Comprehensive codebase review completed
 
 **LLM-First Design**: This blueprint emphasizes LLM-first design where agents (LLM-powered) make routing, conditional, and tool selection decisions. See [LLM_FIRST_DESIGN_REVIEW.md](./LLM_FIRST_DESIGN_REVIEW.md) for compliance review.
 
@@ -59,12 +65,16 @@ You're not just building "a chatbot". You're building:
 * **Natural Language First**: Natural language is a first-class interface for configuration and interaction
 * **Intelligent Orchestration**: Complex decisions use agents, not hardcoded rules
 * **Tool Selection by Agents**: Tools are primarily invoked by agents via LLM reasoning, not directly by workflows
+* **Structured Context**: JSON✯Atomic format provides structured, self-describing data for better LLM understanding
+* **Natural Language Structuring**: TDLN-T pre-processes natural language into JSON✯Atomic format before LLM consumption
 
 **Why LLM-First?**
 * Enables natural language workflow definition
 * Makes routing decisions explainable and adaptable
 * Allows dynamic tool discovery and selection
 * Supports complex, context-aware decision-making
+* Reduces hallucinations through structured context (JSON✯Atomic)
+* Improves understanding through natural language structuring (TDLN-T)
 
 ### 1.4. Vercel-First Architecture
 
@@ -132,11 +142,20 @@ Responsible for *actually doing work*.
   * Calls LLM Router via AI SDK.
   * Handles tool calling loops automatically (AI SDK feature).
   * Streaming support for real-time responses.
+  * Integrates JSON✯Atomic format for structured context.
+  * Pre-processes natural language with TDLN-T (refract to JSON✯Atomic).
+  * Combines natural language summaries with structured atomic data.
 
 * **Tool Runtime**
   * Registry + execution for **tools** (internal APIs, DB queries, 3rd party systems).
   * Enforces app/tool scopes and policy checks before side effects.
   * Includes natural language DB read/write tools.
+  * Includes TDLN-T tools for natural language structuring and translation.
+
+* **Context Services**
+  * **Context Summarizer**: Converts structured data to natural language summaries.
+  * **Atomic Event Converter**: Converts events/steps/runs to JSON✯Atomic format.
+  * **TDLN-T Service**: Structures natural language into JSON✯Atomic (primary use) and deterministic translation (secondary use).
 
 * **Memory Engine** (Phase 4)
   * RAG-enabled memory storage using pgvector.
