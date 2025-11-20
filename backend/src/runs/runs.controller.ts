@@ -7,7 +7,7 @@ import {
   NotFoundException,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { RunsService } from './runs.service';
 import { OrchestratorService } from '../execution/orchestrator.service';
 import { CreateRunDto } from './dto/create-run.dto';

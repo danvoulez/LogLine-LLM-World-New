@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
-import { generateText, streamText, GenerateTextResult, StreamTextResult } from 'ai';
+import { generateText, streamText } from 'ai';
 import { CoreMessage, Tool } from 'ai';
 
 export interface LlmConfig {
@@ -31,36 +31,54 @@ export class LlmRouterService {
     prompt: string | CoreMessage[],
     config: LlmConfig,
     tools?: Record<string, Tool>,
-  ): Promise<GenerateTextResult> {
+  ) {
     const provider = this.getProvider(config.provider);
     const model = provider(config.model);
 
-    return generateText({
-      model,
-      prompt: typeof prompt === 'string' ? prompt : prompt,
-      messages: typeof prompt === 'string' ? undefined : prompt,
-      temperature: config.temperature,
-      maxTokens: config.maxTokens,
-      tools: tools,
-    });
+    if (typeof prompt === 'string') {
+      return generateText({
+        model,
+        prompt,
+        temperature: config.temperature,
+        ...(config.maxTokens && { maxTokens: config.maxTokens }),
+        ...(tools && { tools }),
+      });
+    } else {
+      return generateText({
+        model,
+        messages: prompt,
+        temperature: config.temperature,
+        ...(config.maxTokens && { maxTokens: config.maxTokens }),
+        ...(tools && { tools }),
+      });
+    }
   }
 
   async streamText(
     prompt: string | CoreMessage[],
     config: LlmConfig,
     tools?: Record<string, Tool>,
-  ): Promise<StreamTextResult> {
+  ) {
     const provider = this.getProvider(config.provider);
     const model = provider(config.model);
 
-    return streamText({
-      model,
-      prompt: typeof prompt === 'string' ? prompt : prompt,
-      messages: typeof prompt === 'string' ? undefined : prompt,
-      temperature: config.temperature,
-      maxTokens: config.maxTokens,
-      tools: tools,
-    });
+    if (typeof prompt === 'string') {
+      return streamText({
+        model,
+        prompt,
+        temperature: config.temperature,
+        ...(config.maxTokens && { maxTokens: config.maxTokens }),
+        ...(tools && { tools }),
+      });
+    } else {
+      return streamText({
+        model,
+        messages: prompt,
+        temperature: config.temperature,
+        ...(config.maxTokens && { maxTokens: config.maxTokens }),
+        ...(tools && { tools }),
+      });
+    }
   }
 }
 

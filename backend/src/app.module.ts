@@ -67,6 +67,9 @@ function getDatabaseConfig() {
         return await getDatabaseConfig();
       },
       dataSourceFactory: async (options) => {
+        if (!options) {
+          throw new Error('Database configuration options are required');
+        }
         const dataSource = await new DataSource(options).initialize();
         return dataSource;
       },
