@@ -237,7 +237,7 @@ export class AgentRuntimeService {
           });
 
           // Build atomic context chain
-          const atomicContext = this.atomicConverter.buildAtomicContextChain(
+          const atomicContext = await this.atomicConverter.buildAtomicContextChain(
             steps,
             events,
             run,

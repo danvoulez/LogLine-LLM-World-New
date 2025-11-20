@@ -26,7 +26,13 @@ import { TdlnTModule } from '../tdln-t/tdln-t.module';
     AgentRuntimeService,
     SetupDefaultAgentsService,
     ContextSummarizerService,
-    AtomicEventConverterService,
+    {
+      provide: AtomicEventConverterService,
+      useFactory: (tdlnTService?: TdlnTService) => {
+        return new AtomicEventConverterService(tdlnTService);
+      },
+      inject: [TdlnTService],
+    },
   ],
   exports: [AgentRuntimeService, ContextSummarizerService, AtomicEventConverterService],
 })

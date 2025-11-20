@@ -238,7 +238,7 @@ export class OrchestratorService {
           take: 20,
         });
 
-        const atomicContext = this.atomicConverter.buildAtomicContextChain(
+        const atomicContext = await this.atomicConverter.buildAtomicContextChain(
           steps,
           events,
           run,
@@ -379,7 +379,7 @@ Please respond with the route ID you think is most appropriate (e.g., "high_prio
           take: 20,
         });
 
-        const atomicContext = this.atomicConverter.buildAtomicContextChain(
+        const atomicContext = await this.atomicConverter.buildAtomicContextChain(
           steps,
           events,
           run,

@@ -106,12 +106,12 @@ export class AtomicEventConverterService {
   /**
    * Convert Event to JSON✯Atomic format
    */
-  convertEvent(
+  async convertEvent(
     event: Event,
     run: Run,
     step?: Step,
     previousHash?: string,
-  ): AtomicEvent {
+  ): Promise<AtomicEvent> {
     const type = `event.${event.kind}@1.0.0`;
     const actor = this.extractActor(event, run, step);
 
@@ -219,11 +219,11 @@ export class AtomicEventConverterService {
    * Build atomic context chain (with prev_hash linking)
    * This creates a verifiable chain that LLMs can follow
    */
-  buildAtomicContextChain(
+  async buildAtomicContextChain(
     steps: Step[],
     events: Event[],
     run: Run,
-  ): AtomicContext {
+  ): Promise<AtomicContext> {
     // Convert steps with prev_hash linking
     const atomicSteps: AtomicStep[] = [];
     let prevStepHash: string | undefined;
@@ -240,7 +240,7 @@ export class AtomicEventConverterService {
 
     for (const event of events) {
       const step = steps.find((s) => s.id === event.step_id);
-      const atomicEvent = this.convertEvent(event, run, step, prevEventHash);
+      const atomicEvent = await this.convertEvent(event, run, step, prevEventHash);
       atomicEvents.push(atomicEvent);
       prevEventHash = atomicEvent.hash;
     }
@@ -434,6 +434,67 @@ export class AtomicEventConverterService {
     parts.push('Use this structured information to make informed decisions.');
 
     return parts.join('\n');
+  }
+
+  /**
+   * Refract text fields in payload to JSON✯Atomic format
+   * This structures natural language for better LLM understanding
+   */
+  private async refractTextInPayload(payload: Record<string, any>): Promise<Record<string, any>> {
+    if (!this.tdlnTService) {
+      return payload; // No TDLN-T service, return as-is
+    }
+
+    const refracted: Record<string, any> = { ...payload };
+
+    // Recursively find and refract string values
+    for (const [key, value] of Object.entries(payload)) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        // Check if it looks like natural language (not JSON, not code)
+        if (this.isNaturalLanguage(value)) {
+          try {
+            const atomic = await this.tdlnTService.refractToAtomic(value);
+            refracted[`${key}_refracted`] = atomic;
+            // Keep original for reference
+            refracted[`${key}_original`] = value;
+          } catch (error) {
+            // If refraction fails, keep original
+            console.warn(`Failed to refract ${key}, keeping original:`, error);
+          }
+        }
+      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        // Recursively process nested objects
+        refracted[key] = await this.refractTextInPayload(value);
+      }
+    }
+
+    return refracted;
+  }
+
+  /**
+   * Check if a string is natural language (should be refracted)
+   */
+  private isNaturalLanguage(text: string): boolean {
+    // Don't refract if it's:
+    // - JSON (starts with { or [)
+    // - Code (contains common code patterns)
+    // - Too short (less than 3 words)
+    // - Already structured (contains structured patterns)
+
+    if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+      return false; // JSON
+    }
+
+    if (text.includes('function') || text.includes('const ') || text.includes('import ')) {
+      return false; // Code
+    }
+
+    const words = text.trim().split(/\s+/);
+    if (words.length < 3) {
+      return false; // Too short
+    }
+
+    return true; // Looks like natural language
   }
 }
 

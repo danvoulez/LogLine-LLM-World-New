@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { AtomicEventConverterService, AtomicContext } from './atomic-event-converter.service';
 import { Step } from '../runs/entities/step.entity';
 import { Event } from '../runs/entities/event.entity';
@@ -234,7 +234,7 @@ export class ContextSummarizerService {
     // Build atomic context if converter is available
     if (this.atomicConverter && steps.length > 0) {
       try {
-        const atomicContext = this.atomicConverter.buildAtomicContextChain(
+        const atomicContext = await this.atomicConverter.buildAtomicContextChain(
           steps,
           events,
           run,
