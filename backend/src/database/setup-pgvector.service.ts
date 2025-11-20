@@ -7,6 +7,12 @@ export class SetupPgVectorService implements OnModuleInit {
 
   async onModuleInit() {
     // Enable pgvector extension on app startup
+    // Only run if POSTGRES_URL is available (Vercel Postgres)
+    if (!process.env.POSTGRES_URL) {
+      console.log('ℹ️  POSTGRES_URL not available, skipping pgvector setup');
+      return;
+    }
+
     try {
       await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS vector;');
       console.log('✅ pgvector extension enabled');

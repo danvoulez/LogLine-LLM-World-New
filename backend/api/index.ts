@@ -39,7 +39,15 @@ async function createApp(): Promise<express.Application> {
 }
 
 export default async function handler(req: express.Request, res: express.Response) {
-  const app = await createApp();
-  return app(req, res);
+  try {
+    const app = await createApp();
+    return app(req, res);
+  } catch (error) {
+    console.error('Error in serverless handler:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
 }
 
