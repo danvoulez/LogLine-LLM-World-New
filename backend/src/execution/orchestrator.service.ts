@@ -125,7 +125,7 @@ export class OrchestratorService {
     workflow: Workflow,
   ): Promise<void> {
     const { definition } = workflow;
-    const { nodes, entryNode } = definition;
+    const { nodes, entryNode, edges = [] } = definition;
 
     // Find entry node
     const entry = nodes.find((n) => n.id === entryNode);
@@ -133,32 +133,244 @@ export class OrchestratorService {
       throw new Error(`Entry node ${entryNode} not found`);
     }
 
-    // Build execution order (simple linear traversal)
-    const executionOrder: string[] = [entryNode];
+    // Dynamic execution: execute nodes and determine next node based on output
+    const executedNodes = new Set<string>();
     let currentNode = entryNode;
 
-    // Follow edges to build execution order
-    const edges = definition.edges || [];
-    while (true) {
-      const nextEdge = edges.find((e) => e.from === currentNode);
-      if (!nextEdge) break;
-      executionOrder.push(nextEdge.to);
-      currentNode = nextEdge.to;
+    while (currentNode) {
+      // Prevent infinite loops
+      if (executedNodes.has(currentNode)) {
+        throw new Error(`Circular dependency detected: node ${currentNode} already executed`);
+      }
+      executedNodes.add(currentNode);
+
+      const node = nodes.find((n) => n.id === currentNode);
+      if (!node) {
+        throw new Error(`Node ${currentNode} not found`);
+      }
+
+      // Execute node and get output
+      const stepOutput = await this.executeNode(runId, node);
+
+      // Get the step we just executed to pass its output for routing
+      const executedStep = await this.stepRepository.findOne({
+        where: { run_id: runId, node_id: node.id },
+        order: { started_at: 'DESC' },
+      });
+
+      // Determine next node based on node type and edges
+      currentNode = await this.getNextNode(
+        runId,
+        node,
+        executedStep?.output || stepOutput,
+        edges,
+        nodes,
+      );
+    }
+  }
+
+  private async getNextNode(
+    runId: string,
+    currentNode: { id: string; type: string; [key: string]: any },
+    stepOutput: any,
+    edges: Array<{ from: string; to: string; condition?: string }>,
+    nodes: Array<{ id: string; type: string; [key: string]: any }>,
+  ): Promise<string | null> {
+    // Find all edges from current node
+    const outgoingEdges = edges.filter((e) => e.from === currentNode.id);
+
+    if (outgoingEdges.length === 0) {
+      // No outgoing edges, workflow ends
+      return null;
     }
 
-    // Execute each node in order
-    for (const nodeId of executionOrder) {
-      const node = nodes.find((n) => n.id === nodeId);
-      if (!node) continue;
+    // If router node, use agent to determine route
+    if (currentNode.type === 'router') {
+      return await this.evaluateRouterNode(runId, currentNode, stepOutput, outgoingEdges);
+    }
 
-      await this.executeNode(runId, node);
+    // For conditional edges, evaluate conditions using agent
+    const conditionalEdges = outgoingEdges.filter((e) => e.condition);
+    if (conditionalEdges.length > 0) {
+      // Use agent to evaluate conditions
+      const selectedEdge = await this.evaluateConditionalEdges(
+        runId,
+        stepOutput,
+        conditionalEdges,
+      );
+      if (selectedEdge) {
+        return selectedEdge.to;
+      }
+    }
+
+    // Default: take first edge without condition, or first edge if all have conditions
+    const defaultEdge = outgoingEdges.find((e) => !e.condition) || outgoingEdges[0];
+    return defaultEdge?.to || null;
+  }
+
+  private async evaluateRouterNode(
+    runId: string,
+    routerNode: { id: string; type: string; config?: any; [key: string]: any },
+    stepOutput: any,
+    outgoingEdges: Array<{ from: string; to: string; condition?: string }>,
+  ): Promise<string | null> {
+    const routerAgentId = routerNode.config?.router_agent_id || 'agent.router';
+    const routes = routerNode.config?.routes || [];
+
+    // Build routing context for agent
+    const routingPrompt = `You are a routing agent. Based on the previous step output, determine which route to take.
+
+Previous step output:
+${JSON.stringify(stepOutput, null, 2)}
+
+Available routes:
+${routes.map((r: any, i: number) => `${i + 1}. Route "${r.id}": ${r.condition || 'default'} -> ${r.target_node}`).join('\n')}
+
+Respond with ONLY the route ID (e.g., "high_priority" or "normal"). Do not include any explanation.`;
+
+    try {
+      const run = await this.runRepository.findOne({ where: { id: runId } });
+      if (!run) {
+        throw new Error(`Run ${runId} not found`);
+      }
+
+      // Get previous step to build context
+      const previousSteps = await this.stepRepository.find({
+        where: { run_id: runId },
+        order: { started_at: 'DESC' },
+        take: 5,
+      });
+
+      const context: AgentContext = {
+        runId,
+        stepId: 'router-evaluation', // Temporary step ID
+        appId: run.app_id || undefined,
+        userId: run.user_id || undefined,
+        tenantId: run.tenant_id,
+        workflowInput: run.input,
+        previousSteps: previousSteps.map((s) => ({
+          node_id: s.node_id,
+          output: s.output,
+        })),
+      };
+
+      // Call router agent
+      const result = await this.agentRuntime.runAgentStep(
+        routerAgentId,
+        context,
+        routingPrompt,
+      );
+
+      // Extract route ID from agent response
+      const routeId = this.extractRouteId(result.text, routes);
+
+      // Find edge matching the route
+      const selectedRoute = routes.find((r: any) => r.id === routeId);
+      if (selectedRoute) {
+        return selectedRoute.target_node;
+      }
+
+      // Fallback: use first route
+      if (routes.length > 0) {
+        return routes[0].target_node;
+      }
+
+      // No routes defined, use first outgoing edge
+      return outgoingEdges[0]?.to || null;
+    } catch (error) {
+      console.error(`Error evaluating router node ${routerNode.id}:`, error);
+      // Fallback: use first route or first edge
+      if (routes.length > 0) {
+        return routes[0].target_node;
+      }
+      return outgoingEdges[0]?.to || null;
+    }
+  }
+
+  private extractRouteId(agentResponse: string, routes: Array<{ id: string }>): string {
+    // Try to extract route ID from agent response
+    const responseLower = agentResponse.toLowerCase().trim();
+
+    // Check for exact match
+    for (const route of routes) {
+      if (responseLower === route.id.toLowerCase() || responseLower.includes(route.id.toLowerCase())) {
+        return route.id;
+      }
+    }
+
+    // Try to extract quoted string
+    const quotedMatch = agentResponse.match(/"([^"]+)"/);
+    if (quotedMatch) {
+      const quotedId = quotedMatch[1];
+      if (routes.some((r) => r.id === quotedId)) {
+        return quotedId;
+      }
+    }
+
+    // Default to first route
+    return routes[0]?.id || '';
+  }
+
+  private async evaluateConditionalEdges(
+    runId: string,
+    stepOutput: any,
+    conditionalEdges: Array<{ from: string; to: string; condition?: string }>,
+  ): Promise<{ from: string; to: string; condition?: string } | null> {
+    // Use a default condition evaluation agent
+    const conditionAgentId = 'agent.condition_evaluator';
+
+    const conditionPrompt = `You are a condition evaluator. Based on the step output, determine which condition is true.
+
+Step output:
+${JSON.stringify(stepOutput, null, 2)}
+
+Available conditions:
+${conditionalEdges.map((e, i) => `${i + 1}. "${e.condition}" -> ${e.to}`).join('\n')}
+
+Respond with ONLY the number (1, 2, 3, etc.) of the condition that is true. If none are true, respond with "0".`;
+
+    try {
+      const run = await this.runRepository.findOne({ where: { id: runId } });
+      if (!run) {
+        return null;
+      }
+
+      const context: AgentContext = {
+        runId,
+        stepId: 'condition-evaluation',
+        appId: run.app_id || undefined,
+        userId: run.user_id || undefined,
+        tenantId: run.tenant_id,
+        workflowInput: run.input,
+        previousSteps: [],
+      };
+
+      const result = await this.agentRuntime.runAgentStep(
+        conditionAgentId,
+        context,
+        conditionPrompt,
+      );
+
+      // Extract number from response
+      const numberMatch = result.text.match(/\d+/);
+      if (numberMatch) {
+        const index = parseInt(numberMatch[0], 10) - 1;
+        if (index >= 0 && index < conditionalEdges.length) {
+          return conditionalEdges[index];
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error evaluating conditional edges:', error);
+      return null;
     }
   }
 
   private async executeNode(
     runId: string,
     node: { id: string; type: string; [key: string]: any },
-  ): Promise<void> {
+  ): Promise<any> {
     // Load run for context
     const run = await this.runRepository.findOne({ where: { id: runId } });
     if (!run) {
@@ -201,9 +413,19 @@ export class OrchestratorService {
           output = await this.executeToolNode(runId, savedStep.id, node, run);
           break;
         case 'router':
+          // Router nodes don't produce output, they determine routing
+          // The routing decision is made in getNextNode
+          output = { type: 'router', node_id: node.id };
+          break;
         case 'human_gate':
-          // Placeholder for future implementation
-          output = { message: `Node type ${node.type} not yet implemented` };
+          // Human gate: pause for human approval (future implementation)
+          output = { 
+            type: 'human_gate', 
+            node_id: node.id,
+            message: 'Waiting for human approval',
+            requires_approval: true,
+          };
+          // For now, continue execution (in future, would pause here)
           break;
         default:
           output = { message: `Unknown node type: ${node.type}` };
@@ -221,6 +443,9 @@ export class OrchestratorService {
         kind: EventKind.STEP_COMPLETED,
         payload: { node_id: node.id, output },
       });
+
+      // Return output for routing decisions
+      return output;
     } catch (error) {
       // Mark step as failed
       savedStep.status = StepStatus.FAILED;
