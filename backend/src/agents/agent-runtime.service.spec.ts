@@ -5,8 +5,12 @@ import { AgentRuntimeService } from './agent-runtime.service';
 import { Agent } from './entities/agent.entity';
 import { Tool } from '../tools/entities/tool.entity';
 import { Event } from '../runs/entities/event.entity';
+import { Step } from '../runs/entities/step.entity';
+import { Run } from '../runs/entities/run.entity';
 import { LlmRouterService } from '../llm/llm-router.service';
 import { ToolRuntimeService } from '../tools/tool-runtime.service';
+import { ContextSummarizerService } from './context-summarizer.service';
+import { AtomicEventConverterService } from './atomic-event-converter.service';
 import { NotFoundException } from '@nestjs/common';
 
 describe('AgentRuntimeService', () => {
@@ -27,6 +31,15 @@ describe('AgentRuntimeService', () => {
     save: jest.fn(),
   };
 
+  const mockStepRepository = {
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn(),
+  };
+
+  const mockRunRepository = {
+    findOne: jest.fn().mockResolvedValue(null),
+  };
+
   const mockLlmRouter = {
     generateText: jest.fn().mockResolvedValue({
       text: 'Agent response',
@@ -37,6 +50,20 @@ describe('AgentRuntimeService', () => {
 
   const mockToolRuntime = {
     callTool: jest.fn().mockResolvedValue({ result: 'Tool result' }),
+  };
+
+  const mockContextSummarizer = {
+    buildConversationalContext: jest.fn().mockReturnValue('Context summary'),
+    summarizeWorkflowInput: jest.fn().mockReturnValue('Input summary'),
+  };
+
+  const mockAtomicConverter = {
+    buildAtomicContextChain: jest.fn().mockReturnValue({
+      run_id: 'run-123',
+      steps: [],
+      events: [],
+    }),
+    formatAtomicContextForLLM: jest.fn().mockReturnValue('Atomic context'),
   };
 
   beforeEach(async () => {
@@ -56,12 +83,28 @@ describe('AgentRuntimeService', () => {
           useValue: mockEventRepository,
         },
         {
+          provide: getRepositoryToken(Step),
+          useValue: mockStepRepository,
+        },
+        {
+          provide: getRepositoryToken(Run),
+          useValue: mockRunRepository,
+        },
+        {
           provide: LlmRouterService,
           useValue: mockLlmRouter,
         },
         {
           provide: ToolRuntimeService,
           useValue: mockToolRuntime,
+        },
+        {
+          provide: ContextSummarizerService,
+          useValue: mockContextSummarizer,
+        },
+        {
+          provide: AtomicEventConverterService,
+          useValue: mockAtomicConverter,
         },
       ],
     }).compile();
