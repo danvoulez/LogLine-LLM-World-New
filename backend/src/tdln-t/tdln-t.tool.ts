@@ -41,17 +41,18 @@ export class TdlnTTool implements OnModuleInit {
       };
     });
 
-    // Register refract tool (for pre-processing)
+    // Register refract tool (for pre-processing) - PRIMARY USE CASE
     this.toolRuntime.registerTool('tdln_t.refract', async (input: any, context: ToolContext) => {
-      const refracted = await this.tdlnTService.refract(
+      // Use refractToAtomic for JSON✯Atomic format (primary use case)
+      const atomic = await this.tdlnTService.refractToAtomic(
         input.text,
-        input.grammar || 'grammar_en_us_strict',
+        input.language,
       );
 
       return {
         text: input.text,
-        refracted,
-        components: refracted.map((t) => ({
+        atomic_format: atomic,
+        components: atomic.body.tokens.map((t) => ({
           frequency: t.frequency,
           value: t.value,
           phase: t.phase,

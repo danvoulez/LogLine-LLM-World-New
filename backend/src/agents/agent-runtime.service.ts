@@ -252,6 +252,24 @@ export class AgentRuntimeService {
       console.warn('Failed to build atomic context, falling back to natural language:', error);
     }
 
+    // Refract input text to JSON✯Atomic format (if it's a string)
+    // This structures natural language for better LLM understanding
+    let refractedInput: any = input;
+    if (typeof input === 'string' && input.trim().length > 0) {
+      try {
+        const atomicInput = await this.tdlnTService.refractToAtomic(input);
+        // Add refracted version alongside original
+        refractedInput = {
+          original: input,
+          refracted: atomicInput,
+          // LLM sees both: original for context, refracted for structure
+        };
+      } catch (error) {
+        // If refraction fails, use original input
+        this.logger.warn('Failed to refract input, using original:', error);
+      }
+    }
+
     // Build conversational context (natural language summary)
     const naturalLanguageContext = this.contextSummarizer.buildConversationalContext(
       context.previousSteps || [],
@@ -271,8 +289,24 @@ export class AgentRuntimeService {
       });
     }
 
-    // Add current input (if not already included in context)
-    if (input && typeof input !== 'string') {
+    // Add current input - if refracted, show both original and structured format
+    if (refractedInput && typeof refractedInput === 'object' && refractedInput.refracted) {
+      // Input was refracted to JSON✯Atomic
+      messages.push({
+        role: 'user',
+        content: `Current input (structured format for better understanding):
+
+Original text: "${refractedInput.original}"
+
+Refracted to JSON✯Atomic:
+${JSON.stringify(refractedInput.refracted, null, 2)}
+
+This structured format helps you understand:
+- Semantic components (F_KEY, F_NET, F_CODE, etc.)
+- Clear structure instead of raw text
+- Better context for decision-making`,
+      });
+    } else if (input && typeof input !== 'string') {
       const inputSummary = this.contextSummarizer.summarizeWorkflowInput(input);
       messages.push({
         role: 'user',

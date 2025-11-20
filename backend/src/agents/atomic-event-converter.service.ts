@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Event, EventKind } from '../runs/entities/event.entity';
 import { Step, StepStatus, StepType } from '../runs/entities/step.entity';
 import { Run, RunStatus, RunMode } from '../runs/entities/run.entity';
+import { TdlnTService } from '../tdln-t/tdln-t.service';
 import * as crypto from 'crypto';
 
 /**
@@ -101,6 +102,7 @@ export interface AtomicContext {
  */
 @Injectable()
 export class AtomicEventConverterService {
+  constructor(@Optional() private tdlnTService?: TdlnTService) {}
   /**
    * Convert Event to JSON✯Atomic format
    */
@@ -113,10 +115,16 @@ export class AtomicEventConverterService {
     const type = `event.${event.kind}@1.0.0`;
     const actor = this.extractActor(event, run, step);
 
+    // Refract text in payload to JSON✯Atomic format (if TDLN-T available)
+    let body = event.payload || {};
+    if (this.tdlnTService && event.payload) {
+      body = await this.refractTextInPayload(event.payload);
+    }
+
     const atomicEvent: AtomicEvent = {
       type,
       schema_id: type,
-      body: event.payload || {},
+      body,
       meta: {
         header: {
           who: {

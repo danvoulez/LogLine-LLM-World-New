@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import {
   RefractedToken,
   Grammar,
@@ -12,14 +13,20 @@ import {
 } from './interfaces/tdln-t.interfaces';
 
 /**
- * TDLN-T Service: Deterministic Translation Protocol
+ * TDLN-T Service: Natural Language → JSON✯Atomic Structuring
+ * 
+ * Primary Purpose: Structure ANY natural language into JSON✯Atomic format
+ * for better LLM understanding. Language doesn't matter - structure is universal.
  * 
  * Three Operations:
- * 1. Refract (Φ): Break text into semantic components
- * 2. Transmute (T): Transform using dictionary + syntax rules
- * 3. Project (ρ): Reconstruct translated text
+ * 1. Refract (Φ): Break text into semantic components (frequency, value, phase)
+ * 2. Transmute (T): Transform using dictionary + syntax rules (optional, for translation)
+ * 3. Project (ρ): Reconstruct text (optional, for translation)
  * 
- * Philosophy: Use for deterministic tasks (cost savings), LLMs for complex reasoning
+ * Philosophy: 
+ * - Primary: Structure natural language → JSON✯Atomic (any language)
+ * - Secondary: Translate between languages (deterministic, cost savings)
+ * - LLMs receive structured data, not confusing raw text
  */
 @Injectable()
 export class TdlnTService {
@@ -35,8 +42,11 @@ export class TdlnTService {
   }
 
   /**
-   * Operation 1: Refract (Φ)
-   * Break text into semantic components: (frequency, value, phase)
+   * Operation 1: Refract (Φ) - Primary Use Case
+   * Break ANY natural language into semantic components: (frequency, value, phase)
+   * 
+   * This is the core value: Structure natural language → JSON✯Atomic
+   * Works for any language - structure is universal, language is in `value`
    */
   async refract(text: string, grammarId: string = 'grammar_en_us_strict'): Promise<RefractedToken[]> {
     const grammar = this.getGrammar(grammarId);
@@ -127,7 +137,70 @@ export class TdlnTService {
   }
 
   /**
-   * Full translation pipeline: Refract → Transmute → Project
+   * Refract to JSON✯Atomic format (Primary Use Case)
+   * Structure natural language into atomic format for LLM consumption
+   * 
+   * This is what we should use for ALL natural language before sending to LLMs
+   */
+  async refractToAtomic(
+    text: string,
+    language?: string, // Optional: auto-detect or specify
+  ): Promise<{
+    type: string;
+    schema_id: string;
+    body: {
+      original_text: string;
+      language?: string;
+      tokens: RefractedToken[];
+    };
+    meta: {
+      header: {
+        who: { id: string; role: string };
+        did: string;
+        this: { id: string };
+        when: { ts: string };
+        status: 'APPROVE';
+      };
+      trace_id?: string;
+      context_id?: string;
+      version: string;
+    };
+    hash: string;
+  }> {
+    // Auto-detect grammar based on language or default to English
+    const grammarId = this.detectGrammar(language) || 'grammar_en_us_strict';
+    
+    // Refract text into semantic components
+    const tokens = await this.refract(text, grammarId);
+    
+    // Build JSON✯Atomic format
+    const atomic = {
+      type: 'text.refracted@1.0.0',
+      schema_id: 'text.refracted@1.0.0',
+      body: {
+        original_text: text,
+        language: language || 'auto',
+        tokens,
+      },
+      meta: {
+        header: {
+          who: { id: 'tdln-t', role: 'structuring' },
+          did: 'refract_natural_language',
+          this: { id: `refract-${Date.now()}` },
+          when: { ts: new Date().toISOString() },
+          status: 'APPROVE' as const,
+        },
+        version: '1.0.0',
+      },
+      hash: this.computeHashForAtomic(tokens),
+    };
+
+    return atomic;
+  }
+
+  /**
+   * Full translation pipeline: Refract → Transmute → Project (Secondary Use Case)
+   * Use for deterministic translation between languages
    */
   async translate(
     text: string,
@@ -375,6 +448,33 @@ export class TdlnTService {
 
   getAvailableGrammars(): string[] {
     return Array.from(this.grammars.keys());
+  }
+
+  /**
+   * Detect grammar based on language code
+   */
+  private detectGrammar(language?: string): string | undefined {
+    if (!language) return undefined;
+
+    const mapping: Record<string, string> = {
+      en: 'grammar_en_us_strict',
+      'en-us': 'grammar_en_us_strict',
+      'en_us': 'grammar_en_us_strict',
+      pt: 'grammar_pt_br_strict',
+      'pt-br': 'grammar_pt_br_strict',
+      'pt_br': 'grammar_pt_br_strict',
+      // Add more languages as grammars are added
+    };
+
+    return mapping[language.toLowerCase()];
+  }
+
+  /**
+   * Compute hash for atomic format
+   */
+  private computeHashForAtomic(tokens: RefractedToken[]): string {
+    const content = JSON.stringify(tokens);
+    return crypto.createHash('sha256').update(content).digest('hex');
   }
 }
 
