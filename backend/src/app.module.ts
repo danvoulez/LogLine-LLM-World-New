@@ -23,6 +23,7 @@ import { ToolsModule } from './tools/tools.module';
 import { AgentsModule } from './agents/agents.module';
 import { AppsModule } from './apps/apps.module';
 import { FilesModule } from './files/files.module';
+import { TdlnTModule } from './tdln-t/tdln-t.module';
 import { File } from './files/entities/file.entity';
 import { DataSource } from 'typeorm';
 
@@ -96,10 +97,11 @@ function getDatabaseConfig() {
     RunsModule,
     LlmModule,
     ToolsModule,
-    AgentsModule,
-    AppsModule,
-    FilesModule,
-  ],
+          AgentsModule,
+          AppsModule,
+          FilesModule,
+          TdlnTModule, // TDLN-T deterministic translation
+        ],
   controllers: [AppController, DatabaseController],
   providers: [
     AppService,

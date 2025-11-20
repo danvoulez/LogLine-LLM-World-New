@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Agent } from './entities/agent.entity';
@@ -10,6 +10,7 @@ import { Step } from '../runs/entities/step.entity';
 import { Run } from '../runs/entities/run.entity';
 import { ContextSummarizerService } from './context-summarizer.service';
 import { AtomicEventConverterService } from './atomic-event-converter.service';
+import { TdlnTService } from '../tdln-t/tdln-t.service';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -32,6 +33,8 @@ export interface AgentResult {
 
 @Injectable()
 export class AgentRuntimeService {
+  private readonly logger = new Logger(AgentRuntimeService.name);
+
   constructor(
     @InjectRepository(Agent)
     private agentRepository: Repository<Agent>,
@@ -47,6 +50,7 @@ export class AgentRuntimeService {
     private toolRuntime: ToolRuntimeService,
     private contextSummarizer: ContextSummarizerService,
     private atomicConverter: AtomicEventConverterService,
+    private tdlnTService: TdlnTService,
   ) {}
 
   async runAgentStep(
@@ -54,6 +58,34 @@ export class AgentRuntimeService {
     context: AgentContext,
     input?: any,
   ): Promise<AgentResult> {
+    // Check if task is deterministic (can use TDLN-T instead of LLM)
+    if (this.tdlnTService.isDeterministicTask(input)) {
+      try {
+        const result = await this.tdlnTService.handleDeterministicTask(input);
+        // Log as event
+        await this.eventRepository.save({
+          run_id: context.runId,
+          step_id: context.stepId,
+          kind: EventKind.TOOL_CALL,
+          payload: {
+            tool_id: 'tdln-t',
+            input,
+            output: result,
+            method: 'deterministic',
+            cost: 0,
+          },
+        });
+        return {
+          text: result.text || JSON.stringify(result),
+          toolCalls: [],
+          finishReason: 'stop',
+        };
+      } catch (error) {
+        // If deterministic handling fails, fall back to LLM
+        this.logger.warn(`Deterministic task handling failed, falling back to LLM: ${error.message}`);
+      }
+    }
+
     // Load agent from database
     const agent = await this.agentRepository.findOne({
       where: { id: agentId },

@@ -1,0 +1,68 @@
+{
+  "source": "en_us",
+  "target": "pt_br",
+  "lookup_hash": "sha256:placeholder",
+  "rules": [
+    {
+      "in": "Error",
+      "out": "Erro"
+    },
+    {
+      "in": "Connection",
+      "out": "Conexão"
+    },
+    {
+      "in": "failed",
+      "out": "falhou"
+    },
+    {
+      "in": "Network",
+      "out": "Rede"
+    },
+    {
+      "in": "Red",
+      "out": "Vermelho"
+    },
+    {
+      "in": "File",
+      "out": "Arquivo"
+    },
+    {
+      "in": "success",
+      "out": "sucesso"
+    },
+    {
+      "in": "completed",
+      "out": "concluído"
+    },
+    {
+      "in": "running",
+      "out": "executando"
+    },
+    {
+      "in": "pending",
+      "out": "pendente"
+    },
+    {
+      "in": "agent",
+      "out": "agente"
+    },
+    {
+      "in": "tool",
+      "out": "ferramenta"
+    },
+    {
+      "in": "workflow",
+      "out": "fluxo de trabalho"
+    },
+    {
+      "in": "step",
+      "out": "etapa"
+    },
+    {
+      "in": "run",
+      "out": "execução"
+    }
+  ]
+}
+

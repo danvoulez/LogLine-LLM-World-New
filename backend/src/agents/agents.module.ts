@@ -12,12 +12,14 @@ import { Run } from '../runs/entities/run.entity';
 import { Step } from '../runs/entities/step.entity';
 import { ToolsModule } from '../tools/tools.module';
 import { LlmModule } from '../llm/llm.module';
+import { TdlnTModule } from '../tdln-t/tdln-t.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Agent, Tool, Event, Run, Step]),
     ToolsModule,
     LlmModule,
+    TdlnTModule,
   ],
   controllers: [AgentsController],
   providers: [
