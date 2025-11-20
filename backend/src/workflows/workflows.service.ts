@@ -8,15 +8,22 @@ import { Repository } from 'typeorm';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { Workflow, WorkflowType } from './entities/workflow.entity';
+import { WorkflowValidatorService } from './validators/workflow-validator.service';
 
 @Injectable()
 export class WorkflowsService {
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
+    private workflowValidator: WorkflowValidatorService,
   ) {}
 
   async create(createWorkflowDto: CreateWorkflowDto): Promise<Workflow> {
+    // Validate workflow definition
+    if (createWorkflowDto.definition) {
+      this.workflowValidator.validateWorkflowDefinition(createWorkflowDto.definition);
+    }
+
     const workflow = this.workflowRepository.create({
       ...createWorkflowDto,
       version: createWorkflowDto.version || '1.0.0',
@@ -60,6 +67,11 @@ export class WorkflowsService {
     updateWorkflowDto: UpdateWorkflowDto,
   ): Promise<Workflow> {
     const workflow = await this.findOne(id);
+
+    // Validate workflow definition if being updated
+    if (updateWorkflowDto.definition) {
+      this.workflowValidator.validateWorkflowDefinition(updateWorkflowDto.definition);
+    }
 
     Object.assign(workflow, updateWorkflowDto);
     return this.workflowRepository.save(workflow);

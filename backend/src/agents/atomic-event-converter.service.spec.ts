@@ -20,7 +20,7 @@ describe('AtomicEventConverterService', () => {
   });
 
   describe('convertEvent', () => {
-    it('should convert event to atomic format', () => {
+    it('should convert event to atomic format', async () => {
       const event: Partial<Event> = {
         id: 'event-123',
         kind: EventKind.TOOL_CALL,
@@ -57,7 +57,7 @@ describe('AtomicEventConverterService', () => {
       expect(atomicEvent.hash.length).toBe(64); // SHA-256 hex string
     });
 
-    it('should include prev_hash when provided', () => {
+    it('should include prev_hash when provided', async () => {
       const event: Partial<Event> = {
         id: 'event-123',
         kind: EventKind.LLM_CALL,
@@ -73,7 +73,7 @@ describe('AtomicEventConverterService', () => {
       };
 
       const prevHash = 'abc123def456';
-      const atomicEvent = service.convertEvent(
+      const atomicEvent = await service.convertEvent(
         event as Event,
         run as Run,
         undefined,
@@ -83,7 +83,7 @@ describe('AtomicEventConverterService', () => {
       expect(atomicEvent.prev_hash).toBe(prevHash);
     });
 
-    it('should extract actor from event payload', () => {
+    it('should extract actor from event payload', async () => {
       const event: Partial<Event> = {
         id: 'event-123',
         kind: EventKind.LLM_CALL,
@@ -178,7 +178,7 @@ describe('AtomicEventConverterService', () => {
   });
 
   describe('buildAtomicContextChain', () => {
-    it('should build atomic context chain with prev_hash linking', () => {
+    it('should build atomic context chain with prev_hash linking', async () => {
       const run: Partial<Run> = {
         id: 'run-456',
         tenant_id: 'tenant-123',
@@ -225,7 +225,7 @@ describe('AtomicEventConverterService', () => {
         },
       ];
 
-      const atomicContext = service.buildAtomicContextChain(
+      const atomicContext = await service.buildAtomicContextChain(
         steps as Step[],
         events as Event[],
         run as Run,
@@ -247,7 +247,7 @@ describe('AtomicEventConverterService', () => {
   });
 
   describe('formatAtomicContextForLLM', () => {
-    it('should format atomic context for LLM consumption', () => {
+    it('should format atomic context for LLM consumption', async () => {
       const run: Partial<Run> = {
         id: 'run-456',
         tenant_id: 'tenant-123',
@@ -269,7 +269,7 @@ describe('AtomicEventConverterService', () => {
 
       const events: Partial<Event>[] = [];
 
-      const atomicContext = service.buildAtomicContextChain(
+      const atomicContext = await service.buildAtomicContextChain(
         steps as Step[],
         events as Event[],
         run as Run,
@@ -291,7 +291,7 @@ describe('AtomicEventConverterService', () => {
   });
 
   describe('hash computation', () => {
-    it('should generate consistent hashes', () => {
+    it('should generate consistent hashes', async () => {
       const event: Partial<Event> = {
         id: 'event-123',
         kind: EventKind.TOOL_CALL,
@@ -306,13 +306,13 @@ describe('AtomicEventConverterService', () => {
         mode: RunMode.AUTO,
       };
 
-      const atomicEvent1 = service.convertEvent(
+      const atomicEvent1 = await service.convertEvent(
         event as Event,
         run as Run,
         undefined,
         undefined,
       );
-      const atomicEvent2 = service.convertEvent(
+      const atomicEvent2 = await service.convertEvent(
         event as Event,
         run as Run,
         undefined,
@@ -323,7 +323,7 @@ describe('AtomicEventConverterService', () => {
       expect(atomicEvent1.hash).toBe(atomicEvent2.hash);
     });
 
-    it('should generate different hashes for different inputs', () => {
+    it('should generate different hashes for different inputs', async () => {
       const run: Partial<Run> = {
         id: 'run-456',
         tenant_id: 'tenant-123',
@@ -346,13 +346,13 @@ describe('AtomicEventConverterService', () => {
         ts: new Date('2024-01-01T00:00:00Z'),
       };
 
-      const atomicEvent1 = service.convertEvent(
+      const atomicEvent1 = await service.convertEvent(
         event1 as Event,
         run as Run,
         undefined,
         undefined,
       );
-      const atomicEvent2 = service.convertEvent(
+      const atomicEvent2 = await service.convertEvent(
         event2 as Event,
         run as Run,
         undefined,
@@ -361,6 +361,33 @@ describe('AtomicEventConverterService', () => {
 
       // Different inputs should produce different hashes
       expect(atomicEvent1.hash).not.toBe(atomicEvent2.hash);
+    });
+
+    it('should handle all event kinds', async () => {
+      const run: Partial<Run> = {
+        id: 'run-456',
+        tenant_id: 'tenant-123',
+        mode: RunMode.AUTO,
+      };
+
+      const eventKinds = Object.values(EventKind);
+      for (const kind of eventKinds) {
+        const event: Partial<Event> = {
+          id: `event-${kind}`,
+          kind,
+          payload: { test: 'data' },
+          run_id: 'run-456',
+          ts: new Date('2024-01-01T00:00:00Z'),
+        };
+
+        const atomicEvent = await service.convertEvent(
+          event as Event,
+          run as Run,
+        );
+
+        expect(atomicEvent).toBeDefined();
+        expect(atomicEvent.type).toContain(kind);
+      }
     });
   });
 });

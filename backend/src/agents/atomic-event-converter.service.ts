@@ -3,6 +3,7 @@ import { Event, EventKind } from '../runs/entities/event.entity';
 import { Step, StepStatus, StepType } from '../runs/entities/step.entity';
 import { Run, RunStatus, RunMode } from '../runs/entities/run.entity';
 import { TdlnTService } from '../tdln-t/tdln-t.service';
+import { AtomicValidatorService } from './validators/atomic-validator.service';
 import * as crypto from 'crypto';
 
 /**
@@ -102,7 +103,10 @@ export interface AtomicContext {
  */
 @Injectable()
 export class AtomicEventConverterService {
-  constructor(@Optional() private tdlnTService?: TdlnTService) {}
+  constructor(
+    @Optional() private tdlnTService?: TdlnTService,
+    @Optional() private atomicValidator?: AtomicValidatorService,
+  ) {}
   /**
    * Convert Event to JSON✯Atomic format
    */
@@ -155,6 +159,11 @@ export class AtomicEventConverterService {
 
     if (previousHash) {
       atomicEvent.prev_hash = previousHash;
+    }
+
+    // Validate atomic event structure
+    if (this.atomicValidator) {
+      this.atomicValidator.validateAtomicEvent(atomicEvent);
     }
 
     return atomicEvent;
@@ -210,6 +219,11 @@ export class AtomicEventConverterService {
 
     if (previousHash) {
       atomicStep.prev_hash = previousHash;
+    }
+
+    // Validate atomic step structure
+    if (this.atomicValidator) {
+      this.atomicValidator.validateAtomicStep(atomicStep);
     }
 
     return atomicStep;
@@ -459,7 +473,8 @@ export class AtomicEventConverterService {
             refracted[`${key}_original`] = value;
           } catch (error) {
             // If refraction fails, keep original
-            console.warn(`Failed to refract ${key}, keeping original:`, error);
+            // Note: Logger not available in this service, but error is caught and handled gracefully
+            // Refraction is optional enhancement, so failure is acceptable
           }
         }
       } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {

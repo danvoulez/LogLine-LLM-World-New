@@ -65,8 +65,8 @@ async function bootstrap() {
     }),
   );
 
-  // Note: Global error handling is done via NestJS exception filters
-  // Custom filters can be added in app.module.ts if needed
+  // Global exception filter is registered in app.module.ts
+  // It handles all unhandled exceptions and formats consistent error responses
 
   await app.listen(process.env.PORT ?? 3000);
 }

@@ -5,6 +5,7 @@ import { ToolRuntimeService } from './tool-runtime.service';
 import { ToolsController } from './tools.controller';
 import { NaturalLanguageDbTool } from './natural-language-db.tool';
 import { Event } from '../runs/entities/event.entity';
+import { SchemaValidatorService } from '../common/validators/schema-validator.service';
 import { LlmModule } from '../llm/llm.module';
 import { RunsModule } from '../runs/runs.module';
 
@@ -15,7 +16,7 @@ import { RunsModule } from '../runs/runs.module';
     RunsModule,
   ],
   controllers: [ToolsController],
-  providers: [ToolRuntimeService, NaturalLanguageDbTool],
+  providers: [ToolRuntimeService, NaturalLanguageDbTool, SchemaValidatorService],
   exports: [ToolRuntimeService],
 })
 export class ToolsModule {}

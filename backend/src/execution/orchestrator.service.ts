@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Workflow } from '../workflows/entities/workflow.entity';
@@ -12,6 +12,8 @@ import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 
 @Injectable()
 export class OrchestratorService {
+  private readonly logger = new Logger(OrchestratorService.name);
+
   constructor(
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
@@ -69,7 +71,16 @@ export class OrchestratorService {
 
     // Execute workflow asynchronously (non-blocking)
     this.executeWorkflow(savedRun.id, workflow).catch((error) => {
-      console.error(`Error executing workflow ${workflowId}:`, error);
+      this.logger.error(
+        `Error executing workflow ${workflowId}`,
+        error instanceof Error ? error.stack : String(error),
+        {
+          workflow_id: workflowId,
+          run_id: savedRun.id,
+          tenant_id: tenantId,
+          user_id: userId,
+        },
+      );
       // Error handling is done in executeWorkflow, but log here for visibility
     });
 
@@ -111,15 +122,38 @@ export class OrchestratorService {
         payload: { result: run.result },
       });
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown workflow error';
+
       // Mark run as failed
       run.status = RunStatus.FAILED;
-      run.result = { error: error.message };
+      run.result = {
+        error: errorMessage,
+        error_type: error instanceof Error ? error.name : 'Unknown',
+        ...(error instanceof Error && error.stack && { stack: error.stack }),
+      };
       await this.runRepository.save(run);
+
+      this.logger.error(
+        `Workflow execution failed: ${workflow.id}`,
+        error instanceof Error ? error.stack : String(error),
+        {
+          workflow_id: workflow.id,
+          run_id: runId,
+          tenant_id: run.tenant_id,
+          user_id: run.user_id,
+        },
+      );
 
       await this.eventRepository.save({
         run_id: runId,
         kind: EventKind.RUN_FAILED,
-        payload: { error: error.message, stack: error.stack },
+        payload: {
+          error: errorMessage,
+          error_type: error instanceof Error ? error.name : 'Unknown',
+          ...(error instanceof Error && error.stack && { stack: error.stack }),
+          workflow_id: workflow.id,
+        },
       });
     }
   }
@@ -246,7 +280,11 @@ export class OrchestratorService {
         atomicContextMessage = this.atomicConverter.formatAtomicContextForLLM(atomicContext);
       }
     } catch (error) {
-      console.warn('Failed to build atomic context for routing, using fallback:', error);
+      this.logger.warn(
+        'Failed to build atomic context for routing, using fallback',
+        error instanceof Error ? error.stack : String(error),
+        { run_id: runId },
+      );
     }
 
     const stepSummary = this.contextSummarizer.summarizeStepOutput(stepOutput);
@@ -321,9 +359,25 @@ Please respond with the route ID you think is most appropriate (e.g., "high_prio
       // No routes defined, use first outgoing edge
       return outgoingEdges[0]?.to || null;
     } catch (error) {
-      console.error(`Error evaluating router node ${routerNode.id}:`, error);
-      // Fallback: use first route or first edge
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown router error';
+
+      this.logger.warn(
+        `Router node evaluation failed, using fallback route`,
+        error instanceof Error ? error.stack : String(error),
+        {
+          router_node_id: routerNode.id,
+          run_id: runId,
+          routes_count: routes.length,
+        },
+      );
+
+      // Graceful degradation: use first route or first edge
       if (routes.length > 0) {
+        this.logger.log(
+          `Using fallback route: ${routes[0].target_node}`,
+          { router_node_id: routerNode.id, run_id: runId },
+        );
         return routes[0].target_node;
       }
       return outgoingEdges[0]?.to || null;
@@ -387,7 +441,11 @@ Please respond with the route ID you think is most appropriate (e.g., "high_prio
         atomicContextMessage = this.atomicConverter.formatAtomicContextForLLM(atomicContext);
       }
     } catch (error) {
-      console.warn('Failed to build atomic context for condition evaluation, using fallback:', error);
+      this.logger.warn(
+        'Failed to build atomic context for condition evaluation, using fallback',
+        error instanceof Error ? error.stack : String(error),
+        { run_id: runId },
+      );
     }
 
     const stepSummary = this.contextSummarizer.summarizeStepOutput(stepOutput);
@@ -529,18 +587,54 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
       // Return output for routing decisions
       return output;
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown node execution error';
+
       // Mark step as failed
       savedStep.status = StepStatus.FAILED;
-      savedStep.output = { error: error.message };
+      savedStep.output = {
+        error: errorMessage,
+        error_type: error instanceof Error ? error.name : 'Unknown',
+        ...(error instanceof Error && error.stack && { stack: error.stack }),
+      };
       savedStep.finished_at = new Date();
       await this.stepRepository.save(savedStep);
+
+      const run = await this.runRepository.findOne({ where: { id: runId } });
+      this.logger.error(
+        `Step execution failed: ${node.id} (${node.type})`,
+        error instanceof Error ? error.stack : String(error),
+        {
+          run_id: runId,
+          step_id: savedStep.id,
+          node_id: node.id,
+          node_type: node.type,
+          tenant_id: run?.tenant_id,
+          user_id: run?.user_id,
+        },
+      );
 
       await this.eventRepository.save({
         run_id: runId,
         step_id: savedStep.id,
         kind: EventKind.STEP_FAILED,
-        payload: { node_id: node.id, error: error.message },
+        payload: {
+          node_id: node.id,
+          node_type: node.type,
+          error: errorMessage,
+          error_type: error instanceof Error ? error.name : 'Unknown',
+          ...(error instanceof Error && error.stack && { stack: error.stack }),
+        },
       });
+
+      // For router nodes, try to use fallback route
+      if (node.type === 'router') {
+        this.logger.warn(
+          `Router node failed, attempting fallback route`,
+          { node_id: node.id, run_id: runId },
+        );
+        // Could implement fallback logic here
+      }
 
       throw error;
     }

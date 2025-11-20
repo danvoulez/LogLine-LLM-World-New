@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Agent } from './entities/agent.entity';
@@ -11,6 +11,9 @@ import { Run } from '../runs/entities/run.entity';
 import { ContextSummarizerService } from './context-summarizer.service';
 import { AtomicEventConverterService } from './atomic-event-converter.service';
 import { TdlnTService } from '../tdln-t/tdln-t.service';
+import { AgentNotFoundException } from '../common/exceptions/agent-not-found.exception';
+import { AgentExecutionException } from '../common/exceptions/agent-execution.exception';
+import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -51,6 +54,7 @@ export class AgentRuntimeService {
     private contextSummarizer: ContextSummarizerService,
     private atomicConverter: AtomicEventConverterService,
     private tdlnTService: TdlnTService,
+    private agentInputValidator: AgentInputValidatorService,
   ) {}
 
   async runAgentStep(
@@ -58,6 +62,12 @@ export class AgentRuntimeService {
     context: AgentContext,
     input?: any,
   ): Promise<AgentResult> {
+    // Validate agent ID
+    this.agentInputValidator.validateAgentId(agentId);
+
+    // Validate agent context
+    this.agentInputValidator.validateAgentContext(context);
+
     // Check if task is deterministic (can use TDLN-T instead of LLM)
     if (this.tdlnTService.isDeterministicTask(input)) {
       try {
@@ -86,13 +96,24 @@ export class AgentRuntimeService {
       }
     }
 
+    const logContext = {
+      agent_id: agentId,
+      run_id: context.runId,
+      step_id: context.stepId,
+      user_id: context.userId,
+      tenant_id: context.tenantId,
+    };
+
+    this.logger.log(`Running agent step: ${agentId}`, logContext);
+
     // Load agent from database
     const agent = await this.agentRepository.findOne({
       where: { id: agentId },
     });
 
     if (!agent) {
-      throw new NotFoundException(`Agent with ID ${agentId} not found`);
+      this.logger.error(`Agent not found: ${agentId}`, undefined, logContext);
+      throw new AgentNotFoundException(agentId, logContext);
     }
 
     // Load allowed tools
@@ -137,8 +158,17 @@ export class AgentRuntimeService {
       maxTokens: agent.model_profile.max_tokens,
     };
 
-    // Generate with tool calling
-    const result = await this.llmRouter.generateText(messages, llmConfig, aiTools);
+    // Generate with tool calling (with retry and error handling)
+    const result = await this.llmRouter.generateText(
+      messages,
+      llmConfig,
+      aiTools,
+      {
+        agentId,
+        runId: context.runId,
+        stepId: context.stepId,
+      },
+    );
 
     // Log LLM call as event
     await this.eventRepository.save({

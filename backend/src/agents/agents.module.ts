@@ -13,6 +13,8 @@ import { Step } from '../runs/entities/step.entity';
 import { ToolsModule } from '../tools/tools.module';
 import { LlmModule } from '../llm/llm.module';
 import { TdlnTModule } from '../tdln-t/tdln-t.module';
+import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
+import { AtomicValidatorService } from './validators/atomic-validator.service';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { TdlnTModule } from '../tdln-t/tdln-t.module';
     SetupDefaultAgentsService,
     ContextSummarizerService,
     AtomicEventConverterService,
+    AgentInputValidatorService,
+    AtomicValidatorService,
   ],
   exports: [AgentRuntimeService, ContextSummarizerService, AtomicEventConverterService],
 })

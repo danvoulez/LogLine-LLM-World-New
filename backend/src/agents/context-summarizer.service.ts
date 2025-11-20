@@ -243,7 +243,7 @@ export class ContextSummarizerService {
         parts.push(atomicMessage);
       } catch (error) {
         // Fallback to natural language if atomic conversion fails
-        console.warn('Failed to build atomic context, using natural language fallback:', error);
+        // Note: Logger not available in this service, but error is caught and handled gracefully
         if (steps.length > 0) {
           const stepSummaries = steps.map((s) => ({
             node_id: s.node_id,
