@@ -152,5 +152,121 @@ describe('OrchestratorService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('executeNode - agent and tool nodes', () => {
+    it('should execute agent node', async () => {
+      const workflow = {
+        id: 'workflow-123',
+        name: 'Test Workflow',
+        version: '1.0.0',
+        definition: {
+          nodes: [
+            {
+              id: 'agent1',
+              type: 'agent',
+              config: { agent_id: 'agent.test' },
+            },
+          ],
+          edges: [],
+          entryNode: 'agent1',
+        },
+        type: 'linear',
+      };
+
+      const run = {
+        id: 'run-123',
+        workflow_id: 'workflow-123',
+        status: 'running',
+        mode: 'draft',
+        input: {},
+        tenant_id: 'tenant-1',
+        app_id: null,
+        user_id: null,
+      };
+
+      mockWorkflowRepository.findOne.mockResolvedValue(workflow);
+      mockRunRepository.findOne.mockResolvedValue(run);
+      mockRunRepository.save.mockResolvedValue(run);
+      mockStepRepository.create.mockReturnValue({
+        id: 'step-123',
+        run_id: 'run-123',
+        node_id: 'agent1',
+        status: 'pending',
+      });
+      mockStepRepository.save.mockResolvedValue({
+        id: 'step-123',
+        status: 'completed',
+      });
+      mockEventRepository.save.mockResolvedValue({});
+
+      await service.executeWorkflow('run-123', workflow);
+
+      expect(mockAgentRuntimeService.runAgentStep).toHaveBeenCalledWith(
+        'agent.test',
+        expect.objectContaining({
+          runId: 'run-123',
+          tenantId: 'tenant-1',
+        }),
+        undefined,
+      );
+    });
+
+    it('should execute tool node', async () => {
+      const workflow = {
+        id: 'workflow-123',
+        name: 'Test Workflow',
+        version: '1.0.0',
+        definition: {
+          nodes: [
+            {
+              id: 'tool1',
+              type: 'tool',
+              config: { tool_id: 'test-tool', input: { query: 'test' } },
+            },
+          ],
+          edges: [],
+          entryNode: 'tool1',
+        },
+        type: 'linear',
+      };
+
+      const run = {
+        id: 'run-123',
+        workflow_id: 'workflow-123',
+        status: 'running',
+        mode: 'draft',
+        input: {},
+        tenant_id: 'tenant-1',
+        app_id: null,
+        user_id: null,
+      };
+
+      mockWorkflowRepository.findOne.mockResolvedValue(workflow);
+      mockRunRepository.findOne.mockResolvedValue(run);
+      mockRunRepository.save.mockResolvedValue(run);
+      mockStepRepository.create.mockReturnValue({
+        id: 'step-123',
+        run_id: 'run-123',
+        node_id: 'tool1',
+        status: 'pending',
+      });
+      mockStepRepository.save.mockResolvedValue({
+        id: 'step-123',
+        status: 'completed',
+      });
+      mockEventRepository.save.mockResolvedValue({});
+
+      await service.executeWorkflow('run-123', workflow);
+
+      expect(mockToolRuntimeService.callTool).toHaveBeenCalledWith(
+        'test-tool',
+        { query: 'test' },
+        expect.objectContaining({
+          runId: 'run-123',
+          tenantId: 'tenant-1',
+        }),
+      );
+    });
+  });
 });
 
