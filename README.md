@@ -115,17 +115,18 @@ See [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) for detailed 
 ## Implementation Status
 
 - ✅ **Phase 1**: Platform foundation (workflows, runs, steps, events)
-- 🚧 **Phase 2**: Agents, tools & LLM integration (in progress)
+- ✅ **Phase 1.5**: Serverless optimizations (async execution, streaming)
+- ✅ **Phase 2**: Agents, tools & LLM integration (complete)
 - ⏳ **Phase 3**: App platform & developer surface
 - ⏳ **Phase 4**: RAG memory engine, policy engine, polish
 
 ## Documentation
 
 - [MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md) - Complete system specification
-- [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md) - AI SDK integration guide
-- [PHASE4_RAG_MEMORY_INTEGRATION.md](./PHASE4_RAG_MEMORY_INTEGRATION.md) - RAG memory engine guide
-- [backend/README.md](./backend/README.md) - Backend API documentation
-- [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) - Deployment guide
+- [backend/README.md](./backend/README.md) - Backend API documentation and setup
+- [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) - Vercel deployment guide
+- [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md) - Phase 2 implementation details
+- [PHASE4_RAG_MEMORY_INTEGRATION.md](./PHASE4_RAG_MEMORY_INTEGRATION.md) - Phase 4 RAG implementation plan
 
 ## License
 

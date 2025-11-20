@@ -219,51 +219,82 @@ src/
 └── main.ts            # Application entry point
 ```
 
-## Phase 1 Status
+## Phase 1 & 2 Status
 
-✅ Database schema with Workflow, Run, Step, and Event entities
-✅ Workflow CRUD API with validation
-✅ Run execution endpoints (async execution)
-✅ Streaming endpoints (Server-Sent Events) for real-time monitoring
-✅ Basic orchestrator for linear workflows
-✅ Event logging and trace retrieval
-✅ Unit and E2E tests
+### Phase 1: Platform Foundation ✅
+- ✅ Database schema with Workflow, Run, Step, Event, Tool, and Agent entities
+- ✅ Workflow CRUD API with validation
+- ✅ Run execution endpoints (async execution)
+- ✅ Streaming endpoints (Server-Sent Events) for real-time monitoring
+- ✅ Basic orchestrator for linear workflows
+- ✅ Event logging and trace retrieval
+- ✅ Unit and E2E tests
 
-## Phase 1.5: Serverless Optimizations
+### Phase 1.5: Serverless Optimizations ✅
+- ✅ **Async Workflow Execution**: Workflows execute in background, API returns immediately (prevents Vercel timeout issues)
+- ✅ **Streaming Support**: Real-time updates via Server-Sent Events (SSE) for long-running workflows
 
-✅ **Async Workflow Execution**: Workflows execute in background, API returns immediately (prevents Vercel timeout issues)
-✅ **Streaming Support**: Real-time updates via Server-Sent Events (SSE) for long-running workflows
-✅ **Security**: Natural language DB tools include dry-run mode and SQL validation (documented in Phase 2 plan)
+### Phase 2: AI SDK Integration ✅
+- ✅ **LLM Router Service**: Unified API for OpenAI, Anthropic, Google providers (via Vercel AI SDK v5)
+- ✅ **Agent Runtime Service**: Tool calling, streaming, structured outputs
+- ✅ **Tool Runtime Service**: Registry and execution for tools
+- ✅ **Natural Language DB Tools**: Read/write database operations via natural language (with dry-run mode and SQL validation)
+- ✅ **Orchestrator Updates**: Support for `agent_node` and `tool_node` types
+- ✅ **API Endpoints**: Tools and Agents CRUD endpoints
 
-See [CRITICAL_VERCEL_CONSIDERATIONS.md](../CRITICAL_VERCEL_CONSIDERATIONS.md) and [PHASE1.5_SERVERLESS_OPTIMIZATIONS.md](../PHASE1.5_SERVERLESS_OPTIMIZATIONS.md) for details.
+### API Endpoints (Phase 2)
 
-## Next Steps (Phase 2)
+#### Tools
+- `POST /tools` - Create a tool
+- `GET /tools` - List all tools
+- `GET /tools/:id` - Get tool details
 
-- Agent runtime with LLM integration
-- Tool runtime and registry
-- Policy engine
-- Enhanced workflow node types (agent, tool, router, human_gate)
+#### Agents
+- `POST /agents` - Create an agent
+- `GET /agents/:id` - Get agent details
 
-### Phase 2: AI SDK Integration
+### Example: Create Agent and Tool
 
-We're planning to use [Vercel AI SDK v5](https://v5.ai-sdk.dev/) for Phase 2 implementation:
+```bash
+# Create a tool
+curl -X POST https://your-project.vercel.app/tools \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "natural_language_db_read",
+    "name": "Natural Language DB Read",
+    "description": "Query database using natural language",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {"type": "string", "description": "Your question"}
+      },
+      "required": ["query"]
+    }
+  }'
 
-- **LLM Router**: Unified API for OpenAI, Anthropic, Google providers
-- **Agent Runtime**: Tool calling, streaming, structured outputs
-- **Natural Language SQL**: Query database using natural language (read & write) (inspired by [Vercel's template](https://vercel.com/templates/next.js/natural-language-postgres))
+# Create an agent
+curl -X POST https://your-project.vercel.app/agents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "agent.test",
+    "name": "Test Agent",
+    "instructions": "You are a helpful assistant.",
+    "model_profile": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "temperature": 0.7
+    },
+    "allowed_tools": ["natural_language_db_read"]
+  }'
+```
 
-See [PHASE2_AI_SDK_INTEGRATION.md](../PHASE2_AI_SDK_INTEGRATION.md) for detailed integration plan and [AI_SDK_QUICK_START.md](./AI_SDK_QUICK_START.md) for quick reference.
-
-### Phase 4: RAG Memory Engine
-
-For Phase 4, we'll implement the Memory Engine with RAG capabilities using the [AI SDK RAG Agent guide](https://ai-sdk.dev/llms.txt):
+### Phase 4: RAG Memory Engine (Planned)
 
 - **Memory Storage**: Postgres + pgvector for semantic search
 - **Embedding Service**: AI SDK embeddings for automatic vector generation
 - **RAG Tools**: Memory tools for agents to store/retrieve context
-- **Knowledge Base**: Chunked resources for RAG workflows
 
-See [PHASE4_RAG_MEMORY_INTEGRATION.md](../PHASE4_RAG_MEMORY_INTEGRATION.md) for the complete RAG implementation plan.
+See [PHASE4_RAG_MEMORY_INTEGRATION.md](../PHASE4_RAG_MEMORY_INTEGRATION.md) for implementation plan.
 
 ## License
 

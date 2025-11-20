@@ -2,6 +2,12 @@
 
 This guide explains how to deploy the LogLine backend to Vercel.
 
+## Automatic Deployments
+
+The project is connected to GitHub (`danvoulez/LogLine-LLM-World`). Every push to `main` automatically triggers a production deployment.
+
+**No manual steps needed** - just push to GitHub and Vercel deploys automatically.
+
 ## Prerequisites
 
 1. A Vercel account ([sign up here](https://vercel.com))
