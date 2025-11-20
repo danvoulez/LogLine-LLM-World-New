@@ -12,7 +12,7 @@
 * ✅ Dignified AI partnership implementation
 * ✅ Comprehensive codebase review completed
 
-**LLM-First Design**: This blueprint emphasizes LLM-first design where agents (LLM-powered) make routing, conditional, and tool selection decisions. See [LLM_FIRST_DESIGN_REVIEW.md](./LLM_FIRST_DESIGN_REVIEW.md) for compliance review.
+**LLM-First Design**: This blueprint emphasizes LLM-first design where agents (LLM-powered) make routing, conditional, and tool selection decisions. See [LLM-First Design Review](./docs/design/LLM_FIRST_DESIGN_REVIEW.md) for compliance review.
 
 ---
 
