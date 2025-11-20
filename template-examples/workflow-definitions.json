@@ -1,0 +1,47 @@
+{
+  "conversation_workflow": {
+    "name": "Conversation Workflow",
+    "version": "1.0.0",
+    "type": "linear",
+    "definition": {
+      "entryNode": "conversation_agent",
+      "nodes": [
+        {
+          "id": "conversation_agent",
+          "type": "agent",
+          "config": {
+            "agent_id": "agent.conversational",
+            "input": {
+              "message": "$input.message",
+              "context": "$input.context"
+            }
+          }
+        }
+      ],
+      "edges": []
+    }
+  },
+  "code_agent_workflow": {
+    "name": "Code Agent Workflow",
+    "version": "1.0.0",
+    "type": "linear",
+    "definition": {
+      "entryNode": "code_agent",
+      "nodes": [
+        {
+          "id": "code_agent",
+          "type": "agent",
+          "config": {
+            "agent_id": "agent.code_assistant",
+            "input": {
+              "task": "$input.task",
+              "repository": "$input.repository"
+            }
+          }
+        }
+      ],
+      "edges": []
+    }
+  }
+}
+
