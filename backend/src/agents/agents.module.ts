@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Agent } from './entities/agent.entity';
 import { AgentRuntimeService } from './agent-runtime.service';
+import { AgentsController } from './agents.controller';
 import { Tool } from '../tools/entities/tool.entity';
 import { Event } from '../runs/entities/event.entity';
 import { ToolsModule } from '../tools/tools.module';
@@ -13,6 +14,7 @@ import { LlmModule } from '../llm/llm.module';
     ToolsModule,
     LlmModule,
   ],
+  controllers: [AgentsController],
   providers: [AgentRuntimeService],
   exports: [AgentRuntimeService],
 })

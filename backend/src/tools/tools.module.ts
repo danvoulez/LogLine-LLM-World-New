@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tool } from './entities/tool.entity';
 import { ToolRuntimeService } from './tool-runtime.service';
+import { ToolsController } from './tools.controller';
 import { NaturalLanguageDbTool } from './natural-language-db.tool';
 import { Event } from '../runs/entities/event.entity';
 import { LlmModule } from '../llm/llm.module';
@@ -13,6 +14,7 @@ import { RunsModule } from '../runs/runs.module';
     LlmModule,
     RunsModule,
   ],
+  controllers: [ToolsController],
   providers: [ToolRuntimeService, NaturalLanguageDbTool],
   exports: [ToolRuntimeService],
 })
