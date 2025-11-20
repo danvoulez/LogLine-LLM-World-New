@@ -9,9 +9,12 @@
   - Agent Runtime Service
   - Natural Language DB Tools
   - Orchestrator with agent/tool node support
+- ✅ **API Endpoints**: Tools and Agents CRUD endpoints
 - ✅ **Automatic Deployments**: Active
 
 ## 🧪 Testing Phase 2
+
+**Base URL**: Replace with your Vercel deployment URL (e.g., `https://your-project.vercel.app`)
 
 ### 1. Create a Tool
 
