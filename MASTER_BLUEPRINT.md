@@ -2,7 +2,7 @@
 
 > A **cloud‑native LLM-first Agent OS** + **App platform** built for Vercel deployment.
 
-**Version:** 2.2  
+**Version:** 2.3  
 **Last Updated:** 2024-11-20  
 **Deployment Target:** Vercel (Serverless) + Vercel Postgres
 
@@ -11,6 +11,10 @@
 * ✅ TDLN-T integration for natural language structuring
 * ✅ Dignified AI partnership implementation
 * ✅ Comprehensive codebase review completed
+* ✅ Phase 2.5: Error Handling & Testing improvements
+* ✅ Golden Run (Canon) defined
+* ✅ Execution budgets per run
+* ✅ Policy semantics clarified
 
 **LLM-First Design**: This blueprint emphasizes LLM-first design where agents (LLM-powered) make routing, conditional, and tool selection decisions. See [LLM-First Design Review](./docs/design/LLM_FIRST_DESIGN_REVIEW.md) for compliance review.
 
