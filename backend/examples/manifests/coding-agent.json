@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "app": {
+    "id": "coding-agent",
+    "name": "Coding Agent",
+    "description": "AI-powered code generation and editing assistant",
+    "icon": "💻",
+    "visibility": "private",
+    "owner": "dev-team",
+    "scopes": {
+      "tools": [
+        "natural_language_db_read"
+      ],
+      "external": [
+        "github-api",
+        "file-system"
+      ]
+    },
+    "workflows": [
+      {
+        "id": "generate",
+        "workflow_ref": "workflow-generate-id",
+        "label": "Generate Code",
+        "default_mode": "draft"
+      },
+      {
+        "id": "refactor",
+        "workflow_ref": "workflow-refactor-id",
+        "label": "Refactor Code",
+        "default_mode": "draft"
+      }
+    ],
+    "actions": [
+      {
+        "id": "generate_code",
+        "label": "Generate Code",
+        "workflow_id": "generate",
+        "input_mapping": {
+          "prompt": "$context.prompt",
+          "language": "$context.language",
+          "framework": "$context.framework"
+        }
+      },
+      {
+        "id": "refactor_code",
+        "label": "Refactor Code",
+        "workflow_id": "refactor",
+        "input_mapping": {
+          "file_path": "$context.file_path",
+          "instructions": "$context.instructions"
+        }
+      }
+    ]
+  }
+}
+

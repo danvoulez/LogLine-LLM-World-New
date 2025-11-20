@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "app": {
+    "id": "simple-chat",
+    "name": "Simple Chat",
+    "description": "A minimal chat application using natural language database queries",
+    "icon": "💬",
+    "visibility": "private",
+    "scopes": {
+      "tools": [
+        "natural_language_db_read"
+      ]
+    },
+    "workflows": [
+      {
+        "id": "chat",
+        "workflow_ref": "workflow-chat-id",
+        "label": "Chat Workflow",
+        "default_mode": "draft"
+      }
+    ],
+    "actions": [
+      {
+        "id": "send_message",
+        "label": "Send Message",
+        "workflow_id": "chat",
+        "input_mapping": {
+          "query": "$context.message"
+        }
+      }
+    ]
+  }
+}
+

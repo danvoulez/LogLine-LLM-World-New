@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "app": {
+    "id": "data-analyst",
+    "name": "Data Analyst",
+    "description": "Query and analyze data using natural language",
+    "icon": "📊",
+    "visibility": "org",
+    "owner": "data-team",
+    "scopes": {
+      "tools": [
+        "natural_language_db_read"
+      ]
+    },
+    "workflows": [
+      {
+        "id": "analyze",
+        "workflow_ref": "workflow-analyze-id",
+        "label": "Data Analysis Workflow",
+        "default_mode": "draft"
+      },
+      {
+        "id": "report",
+        "workflow_ref": "workflow-report-id",
+        "label": "Generate Report",
+        "default_mode": "auto"
+      }
+    ],
+    "actions": [
+      {
+        "id": "query_data",
+        "label": "Query Data",
+        "workflow_id": "analyze",
+        "input_mapping": {
+          "question": "$context.question",
+          "filters": "$context.filters"
+        }
+      },
+      {
+        "id": "generate_report",
+        "label": "Generate Report",
+        "workflow_id": "report",
+        "input_mapping": {
+          "data": "$context.data",
+          "format": "$context.format"
+        }
+      }
+    ]
+  }
+}
+

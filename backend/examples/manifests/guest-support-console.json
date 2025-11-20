@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "app": {
+    "id": "guest-support-console",
+    "name": "Guest Support Console",
+    "description": "Support ticket triage and management system",
+    "icon": "🎫",
+    "visibility": "org",
+    "owner": "support-team",
+    "scopes": {
+      "tools": [
+        "ticketing.list_open",
+        "natural_language_db_read",
+        "natural_language_db_write"
+      ]
+    },
+    "workflows": [
+      {
+        "id": "triage",
+        "workflow_ref": "workflow-triage-id",
+        "label": "Ticket Triage",
+        "default_mode": "draft"
+      },
+      {
+        "id": "update",
+        "workflow_ref": "workflow-update-id",
+        "label": "Update Ticket",
+        "default_mode": "draft"
+      }
+    ],
+    "actions": [
+      {
+        "id": "triage_tickets",
+        "label": "Triage Tickets",
+        "workflow_id": "triage",
+        "input_mapping": {
+          "hotel_id": "$context.hotel_id",
+          "filters": "$context.filters"
+        }
+      },
+      {
+        "id": "update_ticket",
+        "label": "Update Ticket",
+        "workflow_id": "update",
+        "input_mapping": {
+          "ticket_id": "$context.ticket_id",
+          "updates": "$context.updates"
+        }
+      }
+    ]
+  }
+}
+
