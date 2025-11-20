@@ -1,0 +1,45 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import { AppModule } from '../src/app.module';
+import express from 'express';
+
+let cachedApp: express.Application;
+
+async function createApp(): Promise<express.Application> {
+  if (cachedApp) {
+    return cachedApp;
+  }
+
+  const expressApp = express();
+  const adapter = new ExpressAdapter(expressApp);
+  
+  const app = await NestFactory.create(AppModule, adapter, {
+    logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn'] : ['error'],
+  });
+
+  // Enable validation globally
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  // Enable CORS for Vercel
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
+
+  await app.init();
+  cachedApp = expressApp;
+  return expressApp;
+}
+
+export default async function handler(req: express.Request, res: express.Response) {
+  const app = await createApp();
+  return app(req, res);
+}
+
