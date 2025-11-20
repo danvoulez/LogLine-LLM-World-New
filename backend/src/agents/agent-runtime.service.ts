@@ -6,7 +6,10 @@ import { Tool } from '../tools/entities/tool.entity';
 import { LlmRouterService, LlmConfig } from '../llm/llm-router.service';
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 import { Event, EventKind } from '../runs/entities/event.entity';
+import { Step } from '../runs/entities/step.entity';
+import { Run } from '../runs/entities/run.entity';
 import { ContextSummarizerService } from './context-summarizer.service';
+import { AtomicEventConverterService } from './atomic-event-converter.service';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -36,9 +39,14 @@ export class AgentRuntimeService {
     private toolRepository: Repository<Tool>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
+    @InjectRepository(Step)
+    private stepRepository: Repository<Step>,
+    @InjectRepository(Run)
+    private runRepository: Repository<Run>,
     private llmRouter: LlmRouterService,
     private toolRuntime: ToolRuntimeService,
     private contextSummarizer: ContextSummarizerService,
+    private atomicConverter: AtomicEventConverterService,
   ) {}
 
   async runAgentStep(
@@ -86,8 +94,8 @@ export class AgentRuntimeService {
       aiTools[toolEntity.id] = tool(toolDefinition as any);
     }
 
-    // Build prompt from agent config
-    const messages = this.buildPrompt(agent, context, input);
+    // Build prompt from agent config (now async to fetch atomic context)
+    const messages = await this.buildPrompt(agent, context, input);
 
     // Get LLM config from agent
     const llmConfig: LlmConfig = {
@@ -161,11 +169,11 @@ export class AgentRuntimeService {
   }
 
 
-  private buildPrompt(
+  private async buildPrompt(
     agent: Agent,
     context: AgentContext,
     input?: any,
-  ): CoreMessage[] {
+  ): Promise<CoreMessage[]> {
     const messages: CoreMessage[] = [];
 
     // System message from agent instructions - add dignity and clarity
@@ -177,17 +185,57 @@ export class AgentRuntimeService {
       });
     }
 
-    // Build conversational context (natural language, not JSON dumps)
-    const contextMessage = this.contextSummarizer.buildConversationalContext(
+    // Build atomic context for LLM understanding (reduces hallucinations, prevents forgetting)
+    let atomicContextMessage = '';
+    try {
+      if (context.runId) {
+        const run = await this.runRepository.findOne({ where: { id: context.runId } });
+        if (run) {
+          // Fetch steps and events for atomic context
+          const steps = await this.stepRepository.find({
+            where: { run_id: context.runId },
+            order: { started_at: 'ASC' },
+            take: 20, // Limit to recent steps
+          });
+
+          const events = await this.eventRepository.find({
+            where: { run_id: context.runId },
+            order: { ts: 'ASC' },
+            take: 50, // Limit to recent events
+          });
+
+          // Build atomic context chain
+          const atomicContext = this.atomicConverter.buildAtomicContextChain(
+            steps,
+            events,
+            run,
+          );
+
+          // Format for LLM (combines atomic structure with natural language)
+          atomicContextMessage = this.atomicConverter.formatAtomicContextForLLM(atomicContext);
+        }
+      }
+    } catch (error) {
+      // Fallback to natural language if atomic conversion fails
+      console.warn('Failed to build atomic context, falling back to natural language:', error);
+    }
+
+    // Build conversational context (natural language summary)
+    const naturalLanguageContext = this.contextSummarizer.buildConversationalContext(
       context.previousSteps || [],
       context.workflowInput,
       typeof input === 'string' ? input : undefined,
     );
 
-    if (contextMessage) {
+    // Combine atomic format (structured) with natural language (dignified)
+    const combinedContext = atomicContextMessage
+      ? `${atomicContextMessage}\n\nNatural Language Summary:\n${naturalLanguageContext}`
+      : naturalLanguageContext;
+
+    if (combinedContext) {
       messages.push({
         role: 'user',
-        content: contextMessage,
+        content: combinedContext,
       });
     }
 
@@ -198,7 +246,7 @@ export class AgentRuntimeService {
         role: 'user',
         content: inputSummary,
       });
-    } else if (input && typeof input === 'string' && !contextMessage.includes(input)) {
+    } else if (input && typeof input === 'string' && !combinedContext.includes(input)) {
       messages.push({
         role: 'user',
         content: input,

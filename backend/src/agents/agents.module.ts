@@ -5,6 +5,7 @@ import { AgentRuntimeService } from './agent-runtime.service';
 import { AgentsController } from './agents.controller';
 import { SetupDefaultAgentsService } from './setup-default-agents.service';
 import { ContextSummarizerService } from './context-summarizer.service';
+import { AtomicEventConverterService } from './atomic-event-converter.service';
 import { Tool } from '../tools/entities/tool.entity';
 import { Event } from '../runs/entities/event.entity';
 import { Run } from '../runs/entities/run.entity';
@@ -19,8 +20,13 @@ import { LlmModule } from '../llm/llm.module';
     LlmModule,
   ],
   controllers: [AgentsController],
-  providers: [AgentRuntimeService, SetupDefaultAgentsService, ContextSummarizerService],
-  exports: [AgentRuntimeService, ContextSummarizerService],
+  providers: [
+    AgentRuntimeService,
+    SetupDefaultAgentsService,
+    ContextSummarizerService,
+    AtomicEventConverterService,
+  ],
+  exports: [AgentRuntimeService, ContextSummarizerService, AtomicEventConverterService],
 })
 export class AgentsModule {}
 

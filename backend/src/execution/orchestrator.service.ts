@@ -7,6 +7,7 @@ import { Step, StepStatus, StepType } from '../runs/entities/step.entity';
 import { Event, EventKind } from '../runs/entities/event.entity';
 import { AgentRuntimeService, AgentContext } from '../agents/agent-runtime.service';
 import { ContextSummarizerService } from '../agents/context-summarizer.service';
+import { AtomicEventConverterService } from '../agents/atomic-event-converter.service';
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class OrchestratorService {
     private agentRuntime: AgentRuntimeService,
     private toolRuntime: ToolRuntimeService,
     private contextSummarizer: ContextSummarizerService,
+    private atomicConverter: AtomicEventConverterService,
   ) {}
 
   async startRun(
