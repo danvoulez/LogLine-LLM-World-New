@@ -2,9 +2,11 @@
 
 > A **cloud‑native LLM-first Agent OS** + **App platform** built for Vercel deployment.
 
-**Version:** 2.0  
+**Version:** 2.1  
 **Last Updated:** 2024  
 **Deployment Target:** Vercel (Serverless) + Vercel Postgres
+
+**LLM-First Design**: This blueprint emphasizes LLM-first design where agents (LLM-powered) make routing, conditional, and tool selection decisions. See [LLM_FIRST_DESIGN_REVIEW.md](./LLM_FIRST_DESIGN_REVIEW.md) for compliance review.
 
 ---
 
