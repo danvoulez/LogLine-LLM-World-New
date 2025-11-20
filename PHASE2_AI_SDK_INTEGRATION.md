@@ -2,6 +2,13 @@
 
 This document outlines how to integrate [Vercel AI SDK v5](https://v5.ai-sdk.dev/) and the natural language Postgres pattern into LogLine's Phase 2 implementation.
 
+## ⚠️ Critical: Serverless Considerations
+
+Before implementing Phase 2, review [CRITICAL_VERCEL_CONSIDERATIONS.md](../CRITICAL_VERCEL_CONSIDERATIONS.md) for:
+- Timeout handling (streaming, async execution)
+- ORM choice (consider Drizzle over TypeORM)
+- Security for natural language DB tools (dry run, RLS)
+
 ## Overview
 
 The Vercel AI SDK v5 provides:
@@ -203,12 +210,13 @@ IMPORTANT:
 
   async createWriteTool() {
     return tool({
-      description: 'Modify the database using natural language. Supports INSERT, UPDATE operations. Requires policy approval.',
+      description: 'Modify the database using natural language. Supports INSERT, UPDATE operations. Requires policy approval and explicit confirmation. By default, runs in dry-run mode to preview SQL before execution.',
       parameters: z.object({
         instruction: z.string().describe('What you want to do with the data in natural language (e.g., "Create a new workflow named X", "Update workflow Y to version 2.0")'),
-        confirm: z.boolean().optional().describe('Set to true to confirm this write operation'),
+        dryRun: z.boolean().optional().default(true).describe('If true, returns the proposed SQL without executing. Set to false and confirm=true to execute.'),
+        confirm: z.boolean().optional().default(false).describe('Set to true to confirm this write operation. Required when dryRun is false.'),
       }),
-      execute: async ({ instruction, confirm }, context) => {
+      execute: async ({ instruction, dryRun = true, confirm = false }, context) => {
         // Check policy before execution
         const allowed = await this.policyEngine.checkToolCall(
           'natural_language_db_write',
@@ -217,6 +225,47 @@ IMPORTANT:
         );
         if (!allowed) {
           throw new Error('Policy denied: Database write access not allowed');
+        }
+
+        // Generate SQL from natural language
+        const { text: sql } = await generateText({
+          model: openai('gpt-4o'),
+          prompt: `Convert this natural language instruction to PostgreSQL SQL:
+          
+Instruction: ${instruction}
+
+Database schema:
+- workflows (id uuid, name text, version text, definition jsonb, type text, created_at timestamp, updated_at timestamp)
+- runs (id uuid, workflow_id uuid, status text, mode text, input jsonb, result jsonb, created_at timestamp)
+
+IMPORTANT: 
+- Only generate INSERT or UPDATE statements
+- Never generate DELETE, DROP, TRUNCATE, or ALTER
+- Return ONLY the SQL query, no explanation`,
+        });
+
+        // Validate SQL (security check)
+        const upper = sql.trim().toUpperCase();
+        const BLOCKED_OPERATIONS = ['DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'CREATE', 'GRANT', 'REVOKE'];
+        const ALLOWED_OPERATIONS = ['INSERT', 'UPDATE'];
+        
+        if (BLOCKED_OPERATIONS.some(op => upper.startsWith(op))) {
+          throw new Error(`Security: Operation ${BLOCKED_OPERATIONS.find(op => upper.startsWith(op))} is not allowed`);
+        }
+        
+        if (!ALLOWED_OPERATIONS.some(op => upper.startsWith(op))) {
+          throw new Error('Security: Only INSERT and UPDATE operations are allowed');
+        }
+
+        // Dry run mode: return SQL without executing
+        if (dryRun && !confirm) {
+          return {
+            dryRun: true,
+            operation: 'preview',
+            proposedSQL: sql,
+            message: 'This is a dry run. Review the SQL above. Set dryRun=false and confirm=true to execute.',
+            requiresConfirmation: true,
+          };
         }
 
         // Require explicit confirmation for write operations

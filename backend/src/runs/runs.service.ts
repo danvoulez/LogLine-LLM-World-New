@@ -28,6 +28,15 @@ export class RunsService {
     return this.toRunResponseDto(run);
   }
 
+  async update(id: string, updates: Partial<Run>): Promise<Run> {
+    await this.runRepository.update(id, updates);
+    const updated = await this.runRepository.findOne({ where: { id } });
+    if (!updated) {
+      throw new NotFoundException(`Run with ID ${id} not found`);
+    }
+    return updated;
+  }
+
   async findEvents(
     runId: string,
   ): Promise<EventResponseDto[]> {

@@ -5,7 +5,9 @@ import {
   Body,
   Param,
   NotFoundException,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { RunsService } from './runs.service';
 import { OrchestratorService } from '../execution/orchestrator.service';
 import { CreateRunDto } from './dto/create-run.dto';
@@ -24,6 +26,7 @@ export class RunsController {
     @Param('id') workflowId: string,
     @Body() createRunDto: CreateRunDto,
   ): Promise<RunResponseDto> {
+    // Start run asynchronously (returns immediately)
     const run = await this.orchestratorService.startRun(
       workflowId,
       createRunDto.input,
@@ -34,6 +37,7 @@ export class RunsController {
       createRunDto.app_action_id,
     );
 
+    // Return immediately - workflow executes in background
     return {
       id: run.id,
       workflow_id: run.workflow_id,
@@ -61,6 +65,76 @@ export class RunsController {
     // Verify run exists
     await this.runsService.findOne(id);
     return this.runsService.findEvents(id);
+  }
+
+  @Get('runs/:id/stream')
+  async streamRun(@Param('id') id: string, @Res() res: Response) {
+    // Set up Server-Sent Events headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Verify run exists
+    try {
+      await this.runsService.findOne(id);
+    } catch (error) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Run not found' })}\n\n`);
+      res.end();
+      return;
+    }
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ type: 'connected', runId: id })}\n\n`);
+
+    // Poll for updates every 500ms
+    const interval = setInterval(async () => {
+      try {
+        const run = await this.runsService.findOne(id);
+        const events = await this.runsService.findEvents(id);
+
+        // Send update
+        res.write(
+          `data: ${JSON.stringify({
+            type: 'update',
+            run: {
+              id: run.id,
+              status: run.status,
+              mode: run.mode,
+              result: run.result,
+            },
+            events: events.slice(-10), // Last 10 events
+          })}\n\n`,
+        );
+
+        // Close if completed or failed
+        if (run.status === 'completed' || run.status === 'failed') {
+          clearInterval(interval);
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'complete',
+              status: run.status,
+            })}\n\n`,
+          );
+          res.end();
+        }
+      } catch (error) {
+        clearInterval(interval);
+        res.write(
+          `data: ${JSON.stringify({
+            type: 'error',
+            error: error.message,
+          })}\n\n`,
+        );
+        res.end();
+      }
+    }, 500);
+
+    // Cleanup on client disconnect
+    res.on('close', () => {
+      clearInterval(interval);
+      res.end();
+    });
   }
 }
 

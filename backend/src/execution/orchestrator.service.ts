@@ -59,11 +59,13 @@ export class OrchestratorService {
       payload: { workflow_id: workflowId, input },
     });
 
-    // Execute workflow asynchronously
+    // Execute workflow asynchronously (non-blocking)
     this.executeWorkflow(savedRun.id, workflow).catch((error) => {
       console.error(`Error executing workflow ${workflowId}:`, error);
+      // Error handling is done in executeWorkflow, but log here for visibility
     });
 
+    // Return immediately - workflow executes in background
     return savedRun;
   }
 

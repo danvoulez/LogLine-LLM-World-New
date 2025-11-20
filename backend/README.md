@@ -84,9 +84,10 @@ The following entities are created:
 
 ### Runs
 
-- `POST /workflows/:id/runs` - Start a new workflow run
-- `GET /runs/:id` - Get run details
+- `POST /workflows/:id/runs` - Start a new workflow run (returns immediately, executes asynchronously)
+- `GET /runs/:id` - Get run details (poll for status updates)
 - `GET /runs/:id/events` - Get all events for a run
+- `GET /runs/:id/stream` - Stream run updates via Server-Sent Events (SSE) for real-time monitoring
 
 ## Example Usage
 
@@ -112,7 +113,7 @@ curl -X POST http://localhost:3000/workflows \
   }'
 ```
 
-### 2. Start a Run
+### 2. Start a Run (Async)
 
 ```bash
 curl -X POST http://localhost:3000/workflows/{workflow-id}/runs \
@@ -123,13 +124,29 @@ curl -X POST http://localhost:3000/workflows/{workflow-id}/runs \
   }'
 ```
 
-### 3. Get Run Details
+**Note**: This returns immediately with a `run_id`. The workflow executes in the background. Check status by polling `GET /runs/:id` or use the streaming endpoint.
+
+### 3. Get Run Details (Poll for Status)
 
 ```bash
 curl http://localhost:3000/runs/{run-id}
 ```
 
-### 4. Get Run Events
+Response includes `status` field: `pending`, `running`, `completed`, or `failed`.
+
+### 4. Stream Run Updates (Real-time)
+
+```bash
+curl -N http://localhost:3000/runs/{run-id}/stream
+```
+
+This opens a Server-Sent Events (SSE) connection that streams real-time updates:
+- `connected` - Initial connection
+- `update` - Status and event updates (every 500ms)
+- `complete` - Workflow finished
+- `error` - Error occurred
+
+### 5. Get Run Events
 
 ```bash
 curl http://localhost:3000/runs/{run-id}/events
@@ -206,10 +223,19 @@ src/
 
 ✅ Database schema with Workflow, Run, Step, and Event entities
 ✅ Workflow CRUD API with validation
-✅ Run execution endpoints
+✅ Run execution endpoints (async execution)
+✅ Streaming endpoints (Server-Sent Events) for real-time monitoring
 ✅ Basic orchestrator for linear workflows
 ✅ Event logging and trace retrieval
 ✅ Unit and E2E tests
+
+## Phase 1.5: Serverless Optimizations
+
+✅ **Async Workflow Execution**: Workflows execute in background, API returns immediately (prevents Vercel timeout issues)
+✅ **Streaming Support**: Real-time updates via Server-Sent Events (SSE) for long-running workflows
+✅ **Security**: Natural language DB tools include dry-run mode and SQL validation (documented in Phase 2 plan)
+
+See [CRITICAL_VERCEL_CONSIDERATIONS.md](../CRITICAL_VERCEL_CONSIDERATIONS.md) and [PHASE1.5_SERVERLESS_OPTIMIZATIONS.md](../PHASE1.5_SERVERLESS_OPTIMIZATIONS.md) for details.
 
 ## Next Steps (Phase 2)
 
