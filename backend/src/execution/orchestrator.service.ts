@@ -5,6 +5,8 @@ import { Workflow } from '../workflows/entities/workflow.entity';
 import { Run, RunStatus } from '../runs/entities/run.entity';
 import { Step, StepStatus, StepType } from '../runs/entities/step.entity';
 import { Event, EventKind } from '../runs/entities/event.entity';
+import { AgentRuntimeService, AgentContext } from '../agents/agent-runtime.service';
+import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 
 @Injectable()
 export class OrchestratorService {
@@ -17,6 +19,8 @@ export class OrchestratorService {
     private stepRepository: Repository<Step>,
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
+    private agentRuntime: AgentRuntimeService,
+    private toolRuntime: ToolRuntimeService,
   ) {}
 
   async startRun(
@@ -155,6 +159,12 @@ export class OrchestratorService {
     runId: string,
     node: { id: string; type: string; [key: string]: any },
   ): Promise<void> {
+    // Load run for context
+    const run = await this.runRepository.findOne({ where: { id: runId } });
+    if (!run) {
+      throw new Error(`Run ${runId} not found`);
+    }
+
     // Create step
     const step = this.stepRepository.create({
       run_id: runId,
@@ -185,7 +195,11 @@ export class OrchestratorService {
           output = await this.executeStaticNode(node);
           break;
         case 'agent':
+          output = await this.executeAgentNode(runId, savedStep.id, node, run);
+          break;
         case 'tool':
+          output = await this.executeToolNode(runId, savedStep.id, node, run);
+          break;
         case 'router':
         case 'human_gate':
           // Placeholder for future implementation
@@ -232,6 +246,71 @@ export class OrchestratorService {
   }): Promise<any> {
     // For static nodes, return the configured output or input
     return node.output || node.value || { message: 'Static node executed' };
+  }
+
+  private async executeAgentNode(
+    runId: string,
+    stepId: string,
+    node: { id: string; type: string; config?: any; [key: string]: any },
+    run: Run,
+  ): Promise<any> {
+    const agentId = node.config?.agent_id;
+    if (!agentId) {
+      throw new Error(`Agent node ${node.id} missing agent_id in config`);
+    }
+
+    // Build agent context
+    const context: AgentContext = {
+      runId,
+      stepId,
+      appId: run.app_id || undefined,
+      userId: run.user_id || undefined,
+      tenantId: run.tenant_id,
+      workflowInput: run.input,
+      previousSteps: [], // TODO: Load previous steps if needed
+    };
+
+    // Execute agent
+    const result = await this.agentRuntime.runAgentStep(
+      agentId,
+      context,
+      node.config?.input || run.input,
+    );
+
+    return {
+      text: result.text,
+      toolCalls: result.toolCalls,
+      finishReason: result.finishReason,
+    };
+  }
+
+  private async executeToolNode(
+    runId: string,
+    stepId: string,
+    node: { id: string; type: string; config?: any; [key: string]: any },
+    run: Run,
+  ): Promise<any> {
+    const toolId = node.config?.tool_id;
+    if (!toolId) {
+      throw new Error(`Tool node ${node.id} missing tool_id in config`);
+    }
+
+    // Build tool context
+    const context: ToolContext = {
+      runId,
+      stepId,
+      appId: run.app_id || undefined,
+      userId: run.user_id || undefined,
+      tenantId: run.tenant_id,
+    };
+
+    // Get tool input from node config or workflow input
+    const toolInput = node.config?.input || run.input || {};
+
+    // Execute tool
+    const result = await this.toolRuntime.callTool(toolId, toolInput, context);
+
+    return result;
   }
 
   private mapNodeTypeToStepType(nodeType: string): StepType {

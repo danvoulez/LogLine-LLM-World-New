@@ -7,10 +7,14 @@ import { Run } from './entities/run.entity';
 import { Step } from './entities/step.entity';
 import { Event } from './entities/event.entity';
 import { Workflow } from '../workflows/entities/workflow.entity';
+import { AgentsModule } from '../agents/agents.module';
+import { ToolsModule } from '../tools/tools.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Run, Step, Event, Workflow]),
+    AgentsModule,
+    ToolsModule,
   ],
   controllers: [RunsController],
   providers: [RunsService, OrchestratorService],

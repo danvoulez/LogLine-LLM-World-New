@@ -13,6 +13,8 @@ import { Agent } from './agents/entities/agent.entity';
 import { SetupPgVectorService } from './database/setup-pgvector.service';
 import { DatabaseController } from './database/database.controller';
 import { LlmModule } from './llm/llm.module';
+import { ToolsModule } from './tools/tools.module';
+import { AgentsModule } from './agents/agents.module';
 import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
@@ -77,6 +79,8 @@ function getDatabaseConfig() {
     WorkflowsModule,
     RunsModule,
     LlmModule,
+    ToolsModule,
+    AgentsModule,
   ],
   controllers: [AppController, DatabaseController],
   providers: [AppService, SetupPgVectorService],
