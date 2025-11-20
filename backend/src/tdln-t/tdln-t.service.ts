@@ -27,6 +27,41 @@ import {
  * - Primary: Structure natural language → JSON✯Atomic (any language)
  * - Secondary: Translate between languages (deterministic, cost savings)
  * - LLMs receive structured data, not confusing raw text
+ * 
+ * CURRENT LIMITATIONS (v1):
+ * ===========================
+ * 
+ * 1. Deterministic Translation:
+ *    - Heuristic-based detection of "deterministic tasks" (simple patterns)
+ *    - Does NOT guarantee 100% determinism for all inputs
+ *    - Complex sentences, idioms, context-dependent phrases may require LLM fallback
+ *    - Heuristics are incomplete and will be expanded over time
+ * 
+ * 2. Refraction Quality:
+ *    - Simple tokenization (word-level, not semantic)
+ *    - Frequency identification is pattern-based, not NLP-powered
+ *    - May not capture complex semantic relationships
+ * 
+ * 3. Grammar Support:
+ *    - Currently limited to English (grammar_en_us_strict)
+ *    - Other languages require grammar definitions
+ * 
+ * 4. Dictionary Coverage:
+ *    - Limited dictionary mappings
+ *    - Missing entries fall back to identity mapping
+ * 
+ * RECOMMENDATIONS:
+ * ================
+ * - Use TDLN-T for: Simple, repetitive tasks, structured data extraction
+ * - Use LLM for: Complex reasoning, context-dependent translation, creative tasks
+ * - Always validate TDLN-T output for critical operations
+ * 
+ * FUTURE IMPROVEMENTS:
+ * ====================
+ * - Enhanced heuristics for deterministic task detection
+ * - NLP-powered semantic analysis for refraction
+ * - Expanded grammar and dictionary support
+ * - Confidence scoring for deterministic vs LLM decision
  */
 @Injectable()
 export class TdlnTService {

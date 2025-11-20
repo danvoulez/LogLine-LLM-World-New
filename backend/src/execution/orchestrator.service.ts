@@ -475,6 +475,13 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
         return null;
       }
 
+      // Load previous steps for context (limit to last 10 for performance)
+      const previousSteps = await this.stepRepository.find({
+        where: { run_id: runId },
+        order: { started_at: 'ASC' },
+        take: 10, // Limit to last 10 steps to avoid context bloat
+      });
+
       const context: AgentContext = {
         runId,
         stepId: 'condition-evaluation',
@@ -482,7 +489,12 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
         userId: run.user_id || undefined,
         tenantId: run.tenant_id,
         workflowInput: run.input,
-        previousSteps: [],
+        previousSteps: previousSteps
+          .filter((s) => s.status === 'completed') // Only completed steps
+          .map((s) => ({
+            node_id: s.node_id,
+            output: s.output,
+          })),
       };
 
       const result = await this.agentRuntime.runAgentStep(
@@ -660,6 +672,13 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
       throw new Error(`Agent node ${node.id} missing agent_id in config`);
     }
 
+    // Load previous steps for context (limit to last 10 for performance)
+    const previousSteps = await this.stepRepository.find({
+      where: { run_id: runId },
+      order: { started_at: 'ASC' },
+      take: 10, // Limit to last 10 steps to avoid context bloat
+    });
+
     // Build agent context
     const context: AgentContext = {
       runId,
@@ -668,7 +687,12 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
       userId: run.user_id || undefined,
       tenantId: run.tenant_id,
       workflowInput: run.input,
-      previousSteps: [], // TODO: Load previous steps if needed
+      previousSteps: previousSteps
+        .filter((s) => s.status === 'completed') // Only completed steps
+        .map((s) => ({
+          node_id: s.node_id,
+          output: s.output,
+        })),
     };
 
     // Execute agent

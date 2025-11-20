@@ -12,6 +12,99 @@ export class NaturalLanguageDbTool {
     private runsService: RunsService,
   ) {}
 
+  /**
+   * Enhanced SQL validation for write operations
+   * 
+   * Validates SQL to prevent:
+   * - Dangerous operations (DELETE, DROP, TRUNCATE, ALTER, CREATE, GRANT, REVOKE)
+   * - Transaction control (BEGIN, COMMIT, ROLLBACK)
+   * - SQL injection attempts
+   * - Operations hidden in CTEs, comments, or subqueries
+   * 
+   * NOTE: This is a heuristic-based validation. For production use with untrusted input,
+   * consider using a proper SQL parser or whitelisting specific operations.
+   * 
+   * @param sql - SQL query to validate
+   * @returns Error message if invalid, null if valid
+   */
+  private validateWriteSQL(sql: string): string | null {
+    // Remove SQL comments (-- and /* */)
+    let cleaned = sql;
+    
+    // Remove single-line comments (-- ...)
+    cleaned = cleaned.replace(/--.*$/gm, '');
+    
+    // Remove multi-line comments (/* ... */)
+    cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+    
+    // Normalize whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    const upper = cleaned.toUpperCase();
+    
+    // Blocked operations (check anywhere in query, not just prefix)
+    const BLOCKED_OPERATIONS = [
+      'DELETE',
+      'DROP',
+      'TRUNCATE',
+      'ALTER',
+      'CREATE',
+      'GRANT',
+      'REVOKE',
+      'EXEC',
+      'EXECUTE',
+      'CALL',
+    ];
+    
+    // Check for blocked operations anywhere in the query
+    for (const op of BLOCKED_OPERATIONS) {
+      // Use word boundary regex to avoid false positives (e.g., "INSERT" matching "INSERTED")
+      const regex = new RegExp(`\\b${op}\\b`, 'i');
+      if (regex.test(cleaned)) {
+        return `Operation ${op} is not allowed`;
+      }
+    }
+    
+    // Block transaction control statements
+    const TRANSACTION_KEYWORDS = ['BEGIN', 'COMMIT', 'ROLLBACK', 'SAVEPOINT', 'RELEASE'];
+    for (const keyword of TRANSACTION_KEYWORDS) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(cleaned)) {
+        return `Transaction control (${keyword}) is not allowed. Transactions are handled automatically.`;
+      }
+    }
+    
+    // Block multiple statements (semicolon-separated)
+    const statements = cleaned.split(';').filter(s => s.trim().length > 0);
+    if (statements.length > 1) {
+      return 'Multiple statements are not allowed. Only single INSERT or UPDATE statements are permitted.';
+    }
+    
+    // Must start with INSERT or UPDATE
+    const ALLOWED_OPERATIONS = ['INSERT', 'UPDATE'];
+    const startsWithAllowed = ALLOWED_OPERATIONS.some((op) => {
+      const regex = new RegExp(`^\\s*${op}\\b`, 'i');
+      return regex.test(cleaned);
+    });
+    
+    if (!startsWithAllowed) {
+      return 'Only INSERT and UPDATE operations are allowed';
+    }
+    
+    // Additional safety: check for suspicious patterns
+    // Block semicolons that might be used for injection
+    if (sql.includes(';') && sql.split(';').length > 2) {
+      return 'Multiple statements detected. Only single statements are allowed.';
+    }
+    
+    // Block UNION (common SQL injection pattern)
+    if (/\bUNION\b/i.test(cleaned)) {
+      return 'UNION operations are not allowed in write queries';
+    }
+    
+    return null; // Valid SQL
+  }
+
   async createReadTool() {
     return {
       id: 'natural_language_db_read',
@@ -115,29 +208,10 @@ SQL query:`,
 
         const sql = result.text.trim();
 
-        // Validate SQL (security check)
-        const upper = sql.toUpperCase();
-        const BLOCKED_OPERATIONS = [
-          'DELETE',
-          'DROP',
-          'TRUNCATE',
-          'ALTER',
-          'CREATE',
-          'GRANT',
-          'REVOKE',
-        ];
-        const ALLOWED_OPERATIONS = ['INSERT', 'UPDATE'];
-
-        if (BLOCKED_OPERATIONS.some((op) => upper.startsWith(op))) {
-          throw new Error(
-            `Security: Operation ${BLOCKED_OPERATIONS.find((op) => upper.startsWith(op))} is not allowed`,
-          );
-        }
-
-        if (!ALLOWED_OPERATIONS.some((op) => upper.startsWith(op))) {
-          throw new Error(
-            'Security: Only INSERT and UPDATE operations are allowed',
-          );
+        // Validate SQL (enhanced security check)
+        const validationError = this.validateWriteSQL(sql);
+        if (validationError) {
+          throw new Error(`Security: ${validationError}`);
         }
 
         // Dry run mode: return SQL without executing
