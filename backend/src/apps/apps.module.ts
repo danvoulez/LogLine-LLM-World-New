@@ -5,6 +5,7 @@ import { AppScope } from './entities/app-scope.entity';
 import { AppWorkflow } from './entities/app-workflow.entity';
 import { AppAction } from './entities/app-action.entity';
 import { AppsRuntimeController } from './apps-runtime.controller';
+import { AppsImportService } from './apps-import.service';
 import { RunsModule } from '../runs/runs.module';
 import { Workflow } from '../workflows/entities/workflow.entity';
 
@@ -14,7 +15,8 @@ import { Workflow } from '../workflows/entities/workflow.entity';
     RunsModule,
   ],
   controllers: [AppsRuntimeController],
-  exports: [],
+  providers: [AppsImportService],
+  exports: [AppsImportService],
 })
 export class AppsModule {}
 

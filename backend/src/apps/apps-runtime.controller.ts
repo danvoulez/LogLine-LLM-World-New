@@ -12,6 +12,7 @@ import { App } from './entities/app.entity';
 import { AppAction } from './entities/app-action.entity';
 import { AppWorkflow } from './entities/app-workflow.entity';
 import { OrchestratorService } from '../execution/orchestrator.service';
+import { AppsImportService } from './apps-import.service';
 
 interface ExecuteActionDto {
   event?: Record<string, any>;
@@ -32,7 +33,20 @@ export class AppsRuntimeController {
     @InjectRepository(AppWorkflow)
     private appWorkflowRepository: Repository<AppWorkflow>,
     private orchestratorService: OrchestratorService,
+    private appsImportService: AppsImportService,
   ) {}
+
+  @Get()
+  async listApps(): Promise<App[]> {
+    return this.appRepository.find({
+      relations: ['scopes', 'workflows', 'actions'],
+    });
+  }
+
+  @Post('import')
+  async importApp(@Body() manifest: any): Promise<App> {
+    return this.appsImportService.importManifest(manifest);
+  }
 
   @Get(':app_id')
   async getApp(@Param('app_id') appId: string): Promise<App> {

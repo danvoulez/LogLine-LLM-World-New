@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
@@ -18,20 +18,20 @@ export enum AppVisibility {
 
 @Entity('apps')
 export class App {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryColumn('varchar')
+  id: string; // Custom ID from manifest (e.g., 'coding-agent-frontend')
 
   @Column()
   name: string;
 
   @Column({ nullable: true })
-  icon: string;
+  icon: string | null;
 
   @Column('text', { nullable: true })
-  description: string;
+  description: string | null;
 
   @Column({ nullable: true })
-  owner: string;
+  owner: string | null;
 
   @Column({
     type: 'enum',

@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "app": {
+    "id": "coding-agent-frontend",
+    "name": "Coding Agent Frontend",
+    "icon": "💻",
+    "description": "Frontend application for code agents and conversational AI",
+    "owner": "org:logline",
+    "visibility": "org",
+    "scopes": {
+      "tools": [
+        "natural_language_db_read",
+        "natural_language_db_write",
+        "ticketing.list_open"
+      ],
+      "memory": [],
+      "external": []
+    },
+    "workflows": [
+      {
+        "id": "conversation_flow",
+        "workflow_ref": "conversation",
+        "label": "Conversation Flow",
+        "default_mode": "draft"
+      },
+      {
+        "id": "code_agent_flow",
+        "workflow_ref": "code_agent",
+        "label": "Code Agent Flow",
+        "default_mode": "draft"
+      }
+    ],
+    "actions": [
+      {
+        "id": "start_conversation",
+        "label": "Start Conversation",
+        "workflow_id": "conversation_flow",
+        "input_mapping": {
+          "message": "$event.message",
+          "context": "$context",
+          "user_id": "$context.user_id",
+          "tenant_id": "$context.tenant_id"
+        }
+      },
+      {
+        "id": "execute_code_agent",
+        "label": "Execute Code Agent",
+        "workflow_id": "code_agent_flow",
+        "input_mapping": {
+          "task": "$event.task",
+          "repository": "$event.repository",
+          "user_id": "$context.user_id",
+          "tenant_id": "$context.tenant_id"
+        }
+      }
+    ]
+  }
+}
+

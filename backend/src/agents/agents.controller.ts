@@ -130,8 +130,10 @@ export class AgentsController {
         body.message,
       );
 
-      // Stream the response
-      res.write(`data: ${JSON.stringify({ type: 'text', content: result.text })}\n\n`);
+      // Stream the response text
+      if (result.text) {
+        res.write(`data: ${JSON.stringify({ type: 'text', content: result.text })}\n\n`);
+      }
 
       // Stream tool calls if any
       if (result.toolCalls && result.toolCalls.length > 0) {

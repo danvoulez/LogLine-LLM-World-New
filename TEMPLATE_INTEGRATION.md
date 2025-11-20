@@ -4,7 +4,13 @@ This guide explains how to adapt the [Vercel coding-agent-template](https://gith
 
 ## Core Principle
 
-**Our backend is the source of truth. The template frontend adapts to call our APIs.**
+**The frontend is treated as an App in our app platform. It registers via manifest and uses app actions API.**
+
+This means:
+1. Frontend registers as an App using `POST /apps/import` with a manifest
+2. Frontend actions (conversation, code agent) are defined as AppActions
+3. Frontend calls `POST /apps/:app_id/actions/:action_id` instead of direct agent calls
+4. All runs are automatically linked to the app for traceability
 
 ## Backend Endpoints Available
 
@@ -26,7 +32,24 @@ This guide explains how to adapt the [Vercel coding-agent-template](https://gith
 ### Workflows
 - `POST /workflows/:id/runs` - Start workflow run
 
-## Step 1: Replace API Client
+## Step 1: Register Frontend as an App
+
+First, import the frontend app manifest to register it as an app:
+
+```bash
+curl -X POST http://localhost:3000/apps/import \
+  -H "Content-Type: application/json" \
+  -d @frontend-app-manifest.json
+```
+
+Or use the manifest from this repo: `frontend-app-manifest.json`
+
+This creates:
+- An App entity with ID `coding-agent-frontend`
+- AppActions: `start_conversation`, `execute_code_agent`
+- AppScopes: Defines which tools the frontend can access
+
+## Step 2: Create API Client
 
 Create or update `lib/backend-client.ts` in the template:
 
@@ -63,7 +86,70 @@ export async function getAgents(): Promise<Agent[]> {
   return response.json();
 }
 
-// Start conversation with agent (streaming)
+// Execute app action (preferred method)
+export async function executeAppAction(
+  appId: string,
+  actionId: string,
+  event: Record<string, any>,
+  context: Record<string, any>,
+  onMessage?: (data: any) => void,
+): Promise<any> {
+  const response = await fetch(`${BACKEND_URL}/apps/${appId}/actions/${actionId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ event, context }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to execute action');
+  }
+
+  const result = await response.json();
+
+  // If action returns a run_id, stream updates
+  if (result.run_id && onMessage) {
+    streamRunUpdates(result.run_id, onMessage);
+  }
+
+  return result;
+}
+
+// Stream run updates
+async function streamRunUpdates(runId: string, onMessage: (data: any) => void) {
+  const response = await fetch(`${BACKEND_URL}/runs/${runId}/stream`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to stream run updates');
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            onMessage(data);
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Start conversation with agent directly (alternative, for backward compatibility)
 export async function startConversation(
   agentId: string,
   message: ConversationMessage,
@@ -155,7 +241,7 @@ export async function getRunEvents(runId: string): Promise<any[]> {
 }
 ```
 
-## Step 2: Create Conversation Component
+## Step 3: Create Conversation Component
 
 Create `components/conversation-panel.tsx`:
 
@@ -171,8 +257,9 @@ interface Message {
   toolCalls?: any[];
 }
 
-export function ConversationPanel({ agentId, userId, tenantId }: {
-  agentId: string;
+export function ConversationPanel({ appId, userId, tenantId }: {
+  appId?: string; // App ID (preferred)
+  agentId?: string; // Direct agent ID (fallback)
   userId?: string;
   tenantId?: string;
 }) {
@@ -211,7 +298,14 @@ export function ConversationPanel({ agentId, userId, tenantId }: {
     const toolCalls: any[] = [];
 
     try {
-      await startConversation(agentId, message, (data) => {
+      // Use app action if appId is provided
+      if (appId) {
+        await executeAppAction(
+          appId,
+          'start_conversation',
+          { message: input },
+          { user_id: userId, tenant_id: tenantId || 'default-tenant' },
+          (data) => {
         if (data.type === 'text') {
           assistantContent += data.content;
           setMessages((prev) => {
@@ -317,7 +411,10 @@ export function ConversationPanel({ agentId, userId, tenantId }: {
 }
 ```
 
-## Step 3: Create Conversation Page
+      });
+      } else if (agentId) {
+        // Fallback to direct agent call
+        await startConversation(agentId, message, (data) => {
 
 Create `app/conversation/page.tsx`:
 
@@ -397,7 +494,9 @@ export default function ConversationPage() {
 }
 ```
 
-## Step 4: Add Mode Switcher
+        });
+      }
+    } catch (error: any) {
 
 Update your main layout or navigation to include a mode switcher:
 
@@ -434,7 +533,7 @@ export function ModeSwitcher() {
 }
 ```
 
-## Step 5: Environment Variables
+## Step 4: Create Conversation Page
 
 Add to your template's `.env.local`:
 
@@ -444,7 +543,7 @@ NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
 # NEXT_PUBLIC_BACKEND_URL=https://your-backend.vercel.app
 ```
 
-## Step 6: Update Template's Agent Calls
+## Step 5: Environment Variables
 
 Replace template's internal agent API calls with calls to our backend:
 
@@ -452,10 +551,23 @@ Replace template's internal agent API calls with calls to our backend:
 2. Replace with calls to `getAgents()` and `startConversation()`
 3. Update agent creation to use `POST /agents`
 
+## Step 6: Update Template's Agent Calls
+
+Replace template's internal agent API calls with:
+1. **Preferred**: Use `executeAppAction()` with app ID and action ID
+2. **Fallback**: Use direct agent calls for backward compatibility
+
 ## Testing
 
 1. Start your backend: `cd backend && npm run start:dev`
-2. Create a test agent with natural language DB tools:
+2. **Register the frontend as an app**:
+   ```bash
+   curl -X POST http://localhost:3000/apps/import \
+     -H "Content-Type: application/json" \
+     -d @frontend-app-manifest.json
+   ```
+3. Create required workflows (conversation, code_agent) or update manifest with existing workflow IDs
+4. Create a test agent with natural language DB tools:
    ```bash
    curl -X POST http://localhost:3000/agents \
      -H "Content-Type: application/json" \
