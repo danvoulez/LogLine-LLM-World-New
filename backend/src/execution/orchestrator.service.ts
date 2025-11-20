@@ -6,6 +6,7 @@ import { Run, RunStatus } from '../runs/entities/run.entity';
 import { Step, StepStatus, StepType } from '../runs/entities/step.entity';
 import { Event, EventKind } from '../runs/entities/event.entity';
 import { AgentRuntimeService, AgentContext } from '../agents/agent-runtime.service';
+import { ContextSummarizerService } from '../agents/context-summarizer.service';
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class OrchestratorService {
     private eventRepository: Repository<Event>,
     private agentRuntime: AgentRuntimeService,
     private toolRuntime: ToolRuntimeService,
+    private contextSummarizer: ContextSummarizerService,
   ) {}
 
   async startRun(
@@ -135,7 +137,7 @@ export class OrchestratorService {
 
     // Dynamic execution: execute nodes and determine next node based on output
     const executedNodes = new Set<string>();
-    let currentNode = entryNode;
+    let currentNode: string | null = entryNode;
 
     while (currentNode) {
       // Prevent infinite loops
@@ -217,16 +219,28 @@ export class OrchestratorService {
     const routerAgentId = routerNode.config?.router_agent_id || 'agent.router';
     const routes = routerNode.config?.routes || [];
 
-    // Build routing context for agent
-    const routingPrompt = `You are a routing agent. Based on the previous step output, determine which route to take.
+    // Build routing context for agent - dignified, clear, helpful
+    const stepSummary = this.contextSummarizer.summarizeStepOutput(stepOutput);
+    const routesDescription = routes
+      .map((r: any, i: number) => {
+        const routeNum = i + 1;
+        const condition = r.condition ? ` (${r.condition})` : '';
+        return `${routeNum}. Route "${r.id}"${condition} → goes to "${r.target_node}"`;
+      })
+      .join('\n');
 
-Previous step output:
-${JSON.stringify(stepOutput, null, 2)}
+    const routingPrompt = `You're helping route this workflow based on what we learned from the previous step.
 
-Available routes:
-${routes.map((r: any, i: number) => `${i + 1}. Route "${r.id}": ${r.condition || 'default'} -> ${r.target_node}`).join('\n')}
+Here's what happened:
+${stepSummary}
 
-Respond with ONLY the route ID (e.g., "high_priority" or "normal"). Do not include any explanation.`;
+Based on these results, we need to decide which route to take:
+
+${routesDescription}
+
+Consider the context and choose the most appropriate route. If you're unsure or need clarification, you can mention that.
+
+Please respond with the route ID you think is most appropriate (e.g., "high_priority" or "normal").`;
 
     try {
       const run = await this.runRepository.findOne({ where: { id: runId } });
@@ -319,15 +333,27 @@ Respond with ONLY the route ID (e.g., "high_priority" or "normal"). Do not inclu
     // Use a default condition evaluation agent
     const conditionAgentId = 'agent.condition_evaluator';
 
-    const conditionPrompt = `You are a condition evaluator. Based on the step output, determine which condition is true.
+    // Build condition evaluation prompt - dignified, clear, helpful
+    const stepSummary = this.contextSummarizer.summarizeStepOutput(stepOutput);
+    const conditionsDescription = conditionalEdges
+      .map((e, i) => {
+        const condNum = i + 1;
+        return `${condNum}. If ${e.condition} → proceed to "${e.to}"`;
+      })
+      .join('\n');
 
-Step output:
-${JSON.stringify(stepOutput, null, 2)}
+    const conditionPrompt = `You're helping evaluate which condition applies based on the step results.
 
-Available conditions:
-${conditionalEdges.map((e, i) => `${i + 1}. "${e.condition}" -> ${e.to}`).join('\n')}
+Here's what we found:
+${stepSummary}
 
-Respond with ONLY the number (1, 2, 3, etc.) of the condition that is true. If none are true, respond with "0".`;
+Based on these results, which condition is true?
+
+${conditionsDescription}
+
+Consider the context carefully. If none of the conditions match, respond with "0".
+
+Please respond with the number (1, 2, 3, etc.) of the condition that applies, or "0" if none match.`;
 
     try {
       const run = await this.runRepository.findOne({ where: { id: runId } });

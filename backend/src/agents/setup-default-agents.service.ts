@@ -25,7 +25,7 @@ export class SetupDefaultAgentsService implements OnModuleInit {
         id: 'agent.router',
         name: 'Router Agent',
         instructions:
-          'You are a routing agent. Your job is to analyze the output from previous workflow steps and determine which route to take based on the available options. Respond with ONLY the route ID (e.g., "high_priority" or "normal"). Do not include any explanation or additional text.',
+          'You are a helpful routing agent. Your job is to analyze the output from previous workflow steps and determine which route to take based on the available options. Consider the context carefully and choose the most appropriate route. Respond with the route ID (e.g., "high_priority" or "normal"). If you need clarification, feel free to ask.',
         model_profile: {
           provider: 'openai',
           model: 'gpt-4o-mini',
@@ -48,7 +48,7 @@ export class SetupDefaultAgentsService implements OnModuleInit {
         id: 'agent.condition_evaluator',
         name: 'Condition Evaluator Agent',
         instructions:
-          'You are a condition evaluator. Your job is to analyze step output and determine which condition is true. Respond with ONLY the number (1, 2, 3, etc.) of the condition that is true. If none are true, respond with "0". Do not include any explanation.',
+          'You are a helpful condition evaluator. Your job is to analyze step output and determine which condition is true. Consider the context carefully and evaluate each condition. Respond with the number (1, 2, 3, etc.) of the condition that is true. If none are true, respond with "0".',
         model_profile: {
           provider: 'openai',
           model: 'gpt-4o-mini',

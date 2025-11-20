@@ -11,7 +11,7 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { FilesService } from './files.service';
 import { CreateFileDto } from './dto/create-file.dto';
 

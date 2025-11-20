@@ -30,22 +30,21 @@ export class NaturalLanguageDbTool {
         // Use AI to convert natural language to SQL
         const result = await generateText({
           model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-          prompt: `Convert this natural language query to PostgreSQL SQL SELECT statement:
+          prompt: `You're helping convert a natural language question into a PostgreSQL SQL SELECT query.
 
-Query: ${input.query}
+Question: ${input.query}
 
-Database schema:
-- workflows (id uuid, name text, version text, definition jsonb, type text, created_at timestamp, updated_at timestamp)
-- runs (id uuid, workflow_id uuid, workflow_version text, app_id uuid, app_action_id uuid, user_id uuid, tenant_id uuid, status text, mode text, input jsonb, result jsonb, created_at timestamp, updated_at timestamp)
-- steps (id uuid, run_id uuid, node_id text, type text, status text, input jsonb, output jsonb, started_at timestamp, finished_at timestamp)
-- events (id uuid, run_id uuid, step_id uuid, kind text, payload jsonb, ts timestamp)
-- tools (id varchar, name varchar, description text, input_schema jsonb, handler_type varchar, handler_config jsonb, created_at timestamp, updated_at timestamp)
-- agents (id varchar, name varchar, instructions text, model_profile jsonb, allowed_tools jsonb, created_at timestamp, updated_at timestamp)
+Here's the database schema you're working with:
+- workflows: stores workflow definitions (id, name, version, definition, type, timestamps)
+- runs: stores workflow execution runs (id, workflow_id, status, mode, input, result, timestamps)
+- steps: stores individual step executions (id, run_id, node_id, type, status, input, output, timestamps)
+- events: stores execution events and logs (id, run_id, step_id, kind, payload, timestamp)
+- tools: stores tool definitions (id, name, description, input_schema, handler config)
+- agents: stores agent definitions (id, name, instructions, model_profile, allowed_tools)
 
-IMPORTANT: 
-- Only generate SELECT queries (READ operations)
-- Never generate INSERT, UPDATE, DELETE, DROP, TRUNCATE, or ALTER
-- Return ONLY the SQL query, no explanation`,
+Please generate a SELECT query that answers the question. This is a read-only operation, so only SELECT statements are allowed. If you notice any issues or need clarification about the schema, feel free to mention them.
+
+Generate the SQL query:`,
         });
 
         const sql = result.text.trim();
@@ -92,25 +91,26 @@ IMPORTANT:
 
         const { instruction, dryRun = true, confirm = false } = input;
 
-        // Generate SQL from natural language
+        // Generate SQL from natural language - dignified, clear, helpful
         const result = await generateText({
           model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-          prompt: `Convert this natural language instruction to PostgreSQL SQL:
+          prompt: `You're helping convert a natural language instruction into a PostgreSQL SQL statement for a write operation.
 
 Instruction: ${instruction}
 
-Database schema:
-- workflows (id uuid, name text, version text, definition jsonb, type text, created_at timestamp, updated_at timestamp)
-- runs (id uuid, workflow_id uuid, workflow_version text, app_id uuid, app_action_id uuid, user_id uuid, tenant_id uuid, status text, mode text, input jsonb, result jsonb, created_at timestamp, updated_at timestamp)
-- steps (id uuid, run_id uuid, node_id text, type text, status text, input jsonb, output jsonb, started_at timestamp, finished_at timestamp)
-- events (id uuid, run_id uuid, step_id uuid, kind text, payload jsonb, ts timestamp)
-- tools (id varchar, name varchar, description text, input_schema jsonb, handler_type varchar, handler_config jsonb, created_at timestamp, updated_at timestamp)
-- agents (id varchar, name varchar, instructions text, model_profile jsonb, allowed_tools jsonb, created_at timestamp, updated_at timestamp)
+Here's the database schema you're working with:
+- workflows: workflow definitions (id, name, version, definition, type, timestamps)
+- runs: workflow execution runs (id, workflow_id, status, mode, input, result, timestamps)
+- steps: step executions (id, run_id, node_id, type, status, input, output, timestamps)
+- events: execution events (id, run_id, step_id, kind, payload, timestamp)
+- tools: tool definitions (id, name, description, input_schema, handler config)
+- agents: agent definitions (id, name, instructions, model_profile, allowed_tools)
 
-IMPORTANT: 
-- Only generate INSERT or UPDATE statements
-- Never generate DELETE, DROP, TRUNCATE, or ALTER
-- Return ONLY the SQL query, no explanation`,
+For this write operation, you can use INSERT or UPDATE statements. Please avoid DELETE, DROP, TRUNCATE, or ALTER operations for safety.
+
+Generate the SQL query that accomplishes the instruction. If you notice any potential issues or need clarification, feel free to mention them.
+
+SQL query:`,
         });
 
         const sql = result.text.trim();

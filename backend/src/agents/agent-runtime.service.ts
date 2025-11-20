@@ -6,6 +6,7 @@ import { Tool } from '../tools/entities/tool.entity';
 import { LlmRouterService, LlmConfig } from '../llm/llm-router.service';
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 import { Event, EventKind } from '../runs/entities/event.entity';
+import { ContextSummarizerService } from './context-summarizer.service';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -37,6 +38,7 @@ export class AgentRuntimeService {
     private eventRepository: Repository<Event>,
     private llmRouter: LlmRouterService,
     private toolRuntime: ToolRuntimeService,
+    private contextSummarizer: ContextSummarizerService,
   ) {}
 
   async runAgentStep(
@@ -166,39 +168,73 @@ export class AgentRuntimeService {
   ): CoreMessage[] {
     const messages: CoreMessage[] = [];
 
-    // System message from agent instructions
+    // System message from agent instructions - add dignity and clarity
     if (agent.instructions) {
+      const enhancedInstructions = this.enhanceInstructions(agent.instructions);
       messages.push({
         role: 'system',
-        content: agent.instructions,
+        content: enhancedInstructions,
       });
     }
 
-    // Add context from previous steps
-    if (context.previousSteps && context.previousSteps.length > 0) {
+    // Build conversational context (natural language, not JSON dumps)
+    const contextMessage = this.contextSummarizer.buildConversationalContext(
+      context.previousSteps || [],
+      context.workflowInput,
+      typeof input === 'string' ? input : undefined,
+    );
+
+    if (contextMessage) {
       messages.push({
         role: 'user',
-        content: `Previous steps:\n${JSON.stringify(context.previousSteps, null, 2)}`,
+        content: contextMessage,
       });
     }
 
-    // Add workflow input
-    if (context.workflowInput) {
+    // Add current input (if not already included in context)
+    if (input && typeof input !== 'string') {
+      const inputSummary = this.contextSummarizer.summarizeWorkflowInput(input);
       messages.push({
         role: 'user',
-        content: `Workflow input: ${JSON.stringify(context.workflowInput, null, 2)}`,
+        content: inputSummary,
       });
-    }
-
-    // Add current input
-    if (input) {
+    } else if (input && typeof input === 'string' && !contextMessage.includes(input)) {
       messages.push({
         role: 'user',
-        content: typeof input === 'string' ? input : JSON.stringify(input, null, 2),
+        content: input,
       });
     }
 
     return messages;
+  }
+
+  /**
+   * Enhance instructions to be more dignified and clear
+   */
+  private enhanceInstructions(instructions: string): string {
+    // If instructions are already well-written, return as-is
+    // Otherwise, wrap with helpful context
+    
+    // Check if instructions are too restrictive or command-like
+    const restrictivePatterns = [
+      /ONLY/i,
+      /Do not/i,
+      /Never/i,
+      /Must not/i,
+      /You must/i,
+    ];
+
+    const isRestrictive = restrictivePatterns.some(pattern => pattern.test(instructions));
+
+    if (!isRestrictive) {
+      // Instructions are already good
+      return instructions;
+    }
+
+    // Add helpful context while preserving original intent
+    return `${instructions}
+
+Remember: You're working in a collaborative environment. If you need clarification or notice any issues, feel free to mention them. We're here to work together to get the best results.`;
   }
 
   private jsonSchemaToZod(schema: Record<string, any>): z.ZodObject<any> {
