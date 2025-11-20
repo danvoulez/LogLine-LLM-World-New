@@ -162,6 +162,67 @@ Responsible for *actually doing work*.
   * Semantic search for context retrieval.
   * Tools for agents to store/retrieve memories.
 
+### 3.6. Golden Run (Canon)
+
+The Golden Run is the minimal, complete execution example in LogLine LLM World.  
+It defines the contract that all future features must respect.
+
+**Golden Run: "Ticket Triage Demo"**
+
+- Workflow: `demo_ticket_triage_v1`
+- Nodes:
+  - `start` (static)
+  - `fetch_tickets` (tool_node → `ticketing.list_open`)
+  - `triage` (agent_node → `agent.ticket_triage`)
+- HTTP Call:
+
+```http
+POST /workflows/{workflow_id}/runs
+Content-Type: application/json
+
+{
+  "input": { "hotel_id": "VV-LISBON" },
+  "mode": "draft"
+}
+```
+
+**Expected Result (form):**
+
+```json
+{
+  "id": "RUN_ID",
+  "status": "completed",
+  "result": {
+    "summary": "N tickets triaged",
+    "tickets": [
+      {
+        "id": "T-1",
+        "subject": "No hot water in room 305",
+        "status": "open",
+        "priority": "urgent",
+        "action": "escalate_to_human"
+      }
+    ]
+  }
+}
+```
+
+**Minimum Events:**
+
+```json
+[
+  { "kind": "run_started", "run_id": "RUN_ID", "ts": "..." },
+  { "kind": "step_started", "step_id": "STEP_START", "node_id": "start" },
+  { "kind": "step_started", "step_id": "STEP_TOOL", "node_id": "fetch_tickets" },
+  { "kind": "tool_call", "payload": { "tool_id": "ticketing.list_open" } },
+  { "kind": "step_started", "step_id": "STEP_AGENT", "node_id": "triage" },
+  { "kind": "llm_call", "payload": { "agent_id": "agent.ticket_triage" } },
+  { "kind": "run_completed", "run_id": "RUN_ID", "ts": "..." }
+]
+```
+
+**Contract:** Any new feature that breaks this story is wrong.
+
 ### 3.3. Control Plane
 
 Defines **what exists and what's allowed**.
@@ -251,6 +312,9 @@ CREATE TABLE runs (
   app_action_id TEXT, -- nullable
   user_id      UUID,
   tenant_id    UUID NOT NULL,
+  cost_limit_cents   INTEGER, -- optional execution budget
+  llm_calls_limit    INTEGER, -- optional execution budget
+  latency_slo_ms     INTEGER, -- optional execution budget
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -281,6 +345,25 @@ CREATE TABLE events (
 CREATE INDEX idx_events_run ON events(run_id, ts);
 CREATE INDEX idx_runs_workflow ON runs(workflow_id);
 CREATE INDEX idx_steps_run ON steps(run_id);
+```
+
+#### 4.1.1. Execution Budgets per Run
+
+Each `run` can optionally carry an "execution budget":
+
+- `cost_limit_cents` – cost ceiling in cents for LLM + charged tools.
+- `llm_calls_limit` – maximum number of LLM calls allowed during the run.
+- `latency_slo_ms` – target latency SLO (for user hot path).
+
+The orchestrator must:
+
+- Terminate the run with a controlled error if the budget is exceeded.
+- Register a `policy_eval` or `error` event with the reason:
+  - `budget_exceeded: cost`
+  - `budget_exceeded: llm_calls`
+  - `budget_exceeded: latency`
+
+This transforms healthy paranoia into something computable and LogLine-core.
 ```
 
 ### 4.2. Tools & Agents
@@ -366,6 +449,33 @@ CREATE TABLE policies (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+#### 4.4.1. Policy Semantics (v1)
+
+To keep the system auditable and predictable, policies in v1 have restricted semantics:
+
+- Policies **cannot** rewrite the input or output of tools/agents.
+- Policies can only:
+  - `allow` – permit the operation.
+  - `deny` – block the operation.
+  - `require_approval` – block until external human approval.
+  - `modify` – only for metadata (e.g., force `mode=draft`), never for business payload.
+
+**Evaluation Order:**
+
+1. Before executing a tool or agent, the orchestrator calls the Policy Engine with:
+   - `subject` (user_id, tenant_id, app_id)
+   - `action` (e.g., `tool_call`, `run_start`)
+   - `resource` (tool_id, workflow_id, agent_id)
+   - `context` (mode, risk_level, etc.)
+
+2. If any policy returns `deny` → operation aborted and `policy_eval` + `error` event logged.
+
+3. If returns `require_approval` → the run enters `status = "paused"` with a `human_gate`.
+
+4. `modify` can only alter control fields (mode, limits, flags), never domain data.
+
+This eliminates ambiguity that would become a headache in the future.
 
 ### 4.5. Memory Items (Phase 4 - with pgvector)
 
