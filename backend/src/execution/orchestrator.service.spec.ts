@@ -205,9 +205,11 @@ describe('OrchestratorService', () => {
         'agent.test',
         expect.objectContaining({
           runId: 'run-123',
+          stepId: expect.any(String),
           tenantId: 'tenant-1',
+          workflowInput: {},
         }),
-        undefined,
+        expect.anything(),
       );
     });
 
