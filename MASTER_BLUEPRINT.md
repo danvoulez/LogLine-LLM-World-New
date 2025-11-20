@@ -49,7 +49,22 @@ You're not just building "a chatbot". You're building:
 * So you can **observe and control** what agents do (critical for business, money, safety).
 * So adding a new app is mostly **configuration** (manifest), not new bespoke code.
 
-### 1.3. Vercel-First Architecture
+### 1.3. LLM-First Design Principle
+
+**Core Principle**: LLMs are the primary decision-makers in the system.
+
+* **Agents Make Decisions**: Routing, conditionals, and tool selection are LLM-powered
+* **Natural Language First**: Natural language is a first-class interface for configuration and interaction
+* **Intelligent Orchestration**: Complex decisions use agents, not hardcoded rules
+* **Tool Selection by Agents**: Tools are primarily invoked by agents via LLM reasoning, not directly by workflows
+
+**Why LLM-First?**
+* Enables natural language workflow definition
+* Makes routing decisions explainable and adaptable
+* Allows dynamic tool discovery and selection
+* Supports complex, context-aware decision-making
+
+### 1.4. Vercel-First Architecture
 
 This blueprint is optimized for **Vercel deployment**:
 
@@ -383,9 +398,14 @@ interface WorkflowNode {
   id: string;
   type: NodeType;
   config?: {
-    tool_id?: string;
-    agent_id?: string;
-    condition?: string; // for router nodes
+    tool_id?: string; // for tool_node
+    agent_id?: string; // for agent_node
+    router_agent_id?: string; // for router nodes - agent that makes routing decision
+    routes?: Array<{ // for router nodes
+      id: string;
+      condition?: string; // natural language condition
+      target_node: string;
+    }>;
   };
 }
 
@@ -408,10 +428,10 @@ interface WorkflowDefinition {
 * Graph must not have infinite cycles without some guard.
 * Node types:
   * `static`: simple deterministic code (no tools/agents).
-  * `tool_node`: calls a single Tool.
-  * `agent_node`: calls an Agent (which may internally use tools).
-  * `router`: conditional routing based on step output.
-  * `human_gate`: pause for human approval (future).
+  * `tool_node`: calls a single Tool directly (use sparingly; prefer `agent_node` for LLM-first design).
+  * `agent_node`: calls an Agent (which may internally use tools). **Preferred for LLM-first design.**
+  * `router`: **LLM-powered** conditional routing based on step output. Uses an agent to make routing decisions.
+  * `human_gate`: pause for human approval. Agent determines if human input is needed (future).
 
 ### 5.2. Example: simple linear workflow
 
@@ -454,6 +474,76 @@ interface WorkflowDefinition {
   ]
 }
 ```
+
+**Note**: In LLM-first design, prefer using `agent_node` that calls tools via LLM reasoning rather than direct `tool_node` calls. This enables dynamic tool selection and better explainability.
+
+### 5.4. Example: workflow with LLM-powered router
+
+```jsonc
+{
+  "entry": "start",
+  "nodes": [
+    { "id": "start", "type": "static" },
+    {
+      "id": "triage",
+      "type": "agent_node",
+      "config": { "agent_id": "agent.ticket_triage" }
+    },
+    {
+      "id": "route_decision",
+      "type": "router",
+      "config": {
+        "router_agent_id": "agent.router",
+        "routes": [
+          {
+            "id": "high_priority",
+            "condition": "if ticket priority is high or urgent",
+            "target_node": "escalate"
+          },
+          {
+            "id": "normal",
+            "condition": "if ticket priority is normal or low",
+            "target_node": "auto_resolve"
+          }
+        ]
+      }
+    },
+    { "id": "escalate", "type": "agent_node", "config": { "agent_id": "agent.escalate" } },
+    { "id": "auto_resolve", "type": "agent_node", "config": { "agent_id": "agent.auto_resolve" } }
+  ],
+  "edges": [
+    { "from": "start", "to": "triage" },
+    { "from": "triage", "to": "route_decision" },
+    { "from": "route_decision", "to": "escalate", "condition": "high_priority" },
+    { "from": "route_decision", "to": "auto_resolve", "condition": "normal" }
+  ]
+}
+```
+
+**LLM-Powered Routing**: The router node uses an agent (`router_agent_id`) to evaluate conditions in natural language and select the appropriate route. This ensures all routing decisions are LLM-powered and explainable.
+
+### 5.5. Conditional Edges
+
+Edges can have `condition` properties that are evaluated using agents:
+
+```jsonc
+{
+  "edges": [
+    {
+      "from": "check_status",
+      "to": "approve",
+      "condition": "if status is approved and amount is less than 1000"
+    },
+    {
+      "from": "check_status",
+      "to": "reject",
+      "condition": "if status is rejected or amount is greater than 1000"
+    }
+  ]
+}
+```
+
+**Evaluation**: Conditions are evaluated by an agent that receives the previous step's output and determines which edge to follow. This enables natural language conditions and context-aware routing.
 
 ---
 
