@@ -20,6 +20,8 @@ import { LlmModule } from './llm/llm.module';
 import { ToolsModule } from './tools/tools.module';
 import { AgentsModule } from './agents/agents.module';
 import { AppsModule } from './apps/apps.module';
+import { FilesModule } from './files/files.module';
+import { File } from './files/entities/file.entity';
 import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
@@ -31,7 +33,7 @@ function getDatabaseConfig() {
     return {
       type: 'postgres' as const,
       url: process.env.POSTGRES_URL,
-      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction],
+      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
       // Vercel Postgres requires SSL in production
@@ -69,6 +71,13 @@ function getDatabaseConfig() {
 
 @Module({
   imports: [
+    // Rate limiting for API protection
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute
+        limit: 100, // 100 requests per minute
+      },
+    ]),
     TypeOrmModule.forRootAsync({
       useFactory: async () => {
         return await getDatabaseConfig();
@@ -87,8 +96,17 @@ function getDatabaseConfig() {
     ToolsModule,
     AgentsModule,
     AppsModule,
+    FilesModule,
   ],
   controllers: [AppController, DatabaseController],
-  providers: [AppService, SetupPgVectorService],
+  providers: [
+    AppService,
+    SetupPgVectorService,
+    // Enable rate limiting globally
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
