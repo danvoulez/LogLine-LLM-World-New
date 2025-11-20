@@ -29,20 +29,27 @@
 
 ## 🔧 Next Steps (Do These in Vercel Dashboard)
 
-### 1. Create Vercel Postgres Database
+### 1. Create Vercel Postgres Database (Neon Serverless Postgres)
 
 **Why**: The app needs a database to store workflows, runs, steps, and events.
+
+**Note**: Vercel Postgres is powered by **Neon Serverless Postgres**, which provides:
+- Automatic scaling
+- Serverless architecture (perfect for Vercel)
+- Built-in connection pooling
+- pgvector support (for Phase 4 RAG)
 
 **Steps**:
 1. Go to: https://vercel.com/dvoulez-team/logline-lln-world
 2. Click **"Storage"** tab (left sidebar)
 3. Click **"Create Database"** button
-4. Select **"Postgres"**
+4. Select **"Postgres"** (this creates a Neon Serverless Postgres instance)
 5. Configure:
    - **Region**: Choose closest to you (e.g., `Washington, D.C., U.S. East`)
    - **Name**: `logline-db` (or default)
 6. Click **"Create"**
 7. ✅ `POSTGRES_URL` will be automatically added as environment variable
+8. ✅ Connection pooling is handled automatically by Neon
 
 **Time**: ~2 minutes
 

@@ -10,7 +10,13 @@ This guide explains how to deploy the LogLine backend to Vercel.
 
 ## Database Setup
 
-### Vercel Postgres (Recommended)
+### Vercel Postgres (Neon Serverless Postgres)
+
+Vercel Postgres is powered by **Neon Serverless Postgres**, which provides:
+- **Serverless architecture**: Scales automatically, pay for what you use
+- **Automatic connection pooling**: Handles serverless function connections perfectly
+- **pgvector support**: Built-in support for vector embeddings (Phase 4 RAG)
+- **Zero-config**: `POSTGRES_URL` automatically set as environment variable
 
 Vercel provides serverless Postgres that integrates seamlessly with your deployment:
 
