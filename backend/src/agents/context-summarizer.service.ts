@@ -1,4 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { AtomicEventConverterService, AtomicContext } from './atomic-event-converter.service';
+import { Step } from '../runs/entities/step.entity';
+import { Event } from '../runs/entities/event.entity';
+import { Run } from '../runs/entities/run.entity';
 
 /**
  * Context Summarizer Service
@@ -10,6 +14,7 @@ import { Injectable } from '@nestjs/common';
  */
 @Injectable()
 export class ContextSummarizerService {
+  constructor(private atomicConverter?: AtomicEventConverterService) {}
   /**
    * Summarize previous steps in natural language
    */
@@ -206,6 +211,64 @@ export class ContextSummarizerService {
       parts.push(this.summarizeWorkflowInput(workflowInput));
     }
 
+    if (currentTask) {
+      parts.push(`\nCurrent task: ${currentTask}`);
+    }
+
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Build conversational context with atomic format support
+   * Combines atomic structure (for LLM understanding) with natural language (for dignity)
+   */
+  async buildConversationalContextWithAtomic(
+    steps: Step[],
+    events: Event[],
+    run: Run,
+    workflowInput?: Record<string, any>,
+    currentTask?: string,
+  ): Promise<string> {
+    const parts: string[] = [];
+
+    // Build atomic context if converter is available
+    if (this.atomicConverter && steps.length > 0) {
+      try {
+        const atomicContext = this.atomicConverter.buildAtomicContextChain(
+          steps,
+          events,
+          run,
+        );
+        const atomicMessage = this.atomicConverter.formatAtomicContextForLLM(atomicContext);
+        parts.push(atomicMessage);
+      } catch (error) {
+        // Fallback to natural language if atomic conversion fails
+        console.warn('Failed to build atomic context, using natural language fallback:', error);
+        if (steps.length > 0) {
+          const stepSummaries = steps.map((s) => ({
+            node_id: s.node_id,
+            output: s.output,
+          }));
+          parts.push(this.summarizePreviousSteps(stepSummaries));
+        }
+      }
+    } else {
+      // Fallback to natural language if atomic converter not available
+      if (steps.length > 0) {
+        const stepSummaries = steps.map((s) => ({
+          node_id: s.node_id,
+          output: s.output,
+        }));
+        parts.push(this.summarizePreviousSteps(stepSummaries));
+      }
+    }
+
+    // Add workflow input summary
+    if (workflowInput && Object.keys(workflowInput).length > 0) {
+      parts.push(this.summarizeWorkflowInput(workflowInput));
+    }
+
+    // Add current task
     if (currentTask) {
       parts.push(`\nCurrent task: ${currentTask}`);
     }

@@ -222,6 +222,33 @@ export class OrchestratorService {
     const routes = routerNode.config?.routes || [];
 
     // Build routing context for agent - dignified, clear, helpful
+    // Use atomic format for better LLM understanding
+    let atomicContextMessage = '';
+    try {
+      const run = await this.runRepository.findOne({ where: { id: runId } });
+      if (run) {
+        const steps = await this.stepRepository.find({
+          where: { run_id: runId },
+          order: { started_at: 'ASC' },
+          take: 10,
+        });
+        const events = await this.eventRepository.find({
+          where: { run_id: runId },
+          order: { ts: 'ASC' },
+          take: 20,
+        });
+
+        const atomicContext = this.atomicConverter.buildAtomicContextChain(
+          steps,
+          events,
+          run,
+        );
+        atomicContextMessage = this.atomicConverter.formatAtomicContextForLLM(atomicContext);
+      }
+    } catch (error) {
+      console.warn('Failed to build atomic context for routing, using fallback:', error);
+    }
+
     const stepSummary = this.contextSummarizer.summarizeStepOutput(stepOutput);
     const routesDescription = routes
       .map((r: any, i: number) => {
@@ -233,7 +260,7 @@ export class OrchestratorService {
 
     const routingPrompt = `You're helping route this workflow based on what we learned from the previous step.
 
-Here's what happened:
+${atomicContextMessage ? `${atomicContextMessage}\n\n` : ''}Here's what happened in the previous step:
 ${stepSummary}
 
 Based on these results, we need to decide which route to take:
@@ -336,6 +363,33 @@ Please respond with the route ID you think is most appropriate (e.g., "high_prio
     const conditionAgentId = 'agent.condition_evaluator';
 
     // Build condition evaluation prompt - dignified, clear, helpful
+    // Use atomic format for better LLM understanding
+    let atomicContextMessage = '';
+    try {
+      const run = await this.runRepository.findOne({ where: { id: runId } });
+      if (run) {
+        const steps = await this.stepRepository.find({
+          where: { run_id: runId },
+          order: { started_at: 'ASC' },
+          take: 10,
+        });
+        const events = await this.eventRepository.find({
+          where: { run_id: runId },
+          order: { ts: 'ASC' },
+          take: 20,
+        });
+
+        const atomicContext = this.atomicConverter.buildAtomicContextChain(
+          steps,
+          events,
+          run,
+        );
+        atomicContextMessage = this.atomicConverter.formatAtomicContextForLLM(atomicContext);
+      }
+    } catch (error) {
+      console.warn('Failed to build atomic context for condition evaluation, using fallback:', error);
+    }
+
     const stepSummary = this.contextSummarizer.summarizeStepOutput(stepOutput);
     const conditionsDescription = conditionalEdges
       .map((e, i) => {
@@ -346,7 +400,7 @@ Please respond with the route ID you think is most appropriate (e.g., "high_prio
 
     const conditionPrompt = `You're helping evaluate which condition applies based on the step results.
 
-Here's what we found:
+${atomicContextMessage ? `${atomicContextMessage}\n\n` : ''}Here's what we found in the previous step:
 ${stepSummary}
 
 Based on these results, which condition is true?
