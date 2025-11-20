@@ -7,15 +7,21 @@ import { BaseException } from './base.exception';
 export class WorkflowValidationException extends BaseException {
   constructor(
     message: string,
-    validationErrors?: string[],
+    validationErrors?: string[] | { errors: Array<{ field: string; message: string; value?: any }> },
     context?: Record<string, any>,
   ) {
+    // Handle both old format (string[]) and new format ({ errors: [...] })
+    const errors = Array.isArray(validationErrors)
+      ? validationErrors
+      : validationErrors?.errors?.map((e: any) => `${e.field}: ${e.message}`) || [];
+
     super(
       `Workflow validation failed: ${message}`,
       HttpStatus.BAD_REQUEST,
       'WORKFLOW_VALIDATION_ERROR',
       {
-        validation_errors: validationErrors || [],
+        validation_errors: errors,
+        ...(typeof validationErrors === 'object' && !Array.isArray(validationErrors) ? validationErrors : {}),
         ...context,
       },
     );

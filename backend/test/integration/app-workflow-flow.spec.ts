@@ -16,7 +16,6 @@ import { RunsModule } from '../../src/runs/runs.module';
 import { ToolsModule } from '../../src/tools/tools.module';
 import { AppsImportService } from '../../src/apps/apps-import.service';
 import { OrchestratorService } from '../../src/execution/orchestrator.service';
-import { ExecutionModule } from '../../src/execution/execution.module';
 
 describe('App Workflow Flow Integration', () => {
   let module: TestingModule;
@@ -52,7 +51,6 @@ describe('App Workflow Flow Integration', () => {
         WorkflowsModule,
         RunsModule,
         ToolsModule,
-        ExecutionModule,
       ],
     }).compile();
 

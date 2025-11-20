@@ -6,6 +6,7 @@ import { App } from './entities/app.entity';
 import { AppAction } from './entities/app-action.entity';
 import { AppWorkflow } from './entities/app-workflow.entity';
 import { OrchestratorService } from '../execution/orchestrator.service';
+import { AppsImportService } from './apps-import.service';
 import { NotFoundException } from '@nestjs/common';
 import { Workflow } from '../workflows/entities/workflow.entity';
 
@@ -32,6 +33,10 @@ describe('AppsRuntimeController', () => {
     startRun: jest.fn(),
   };
 
+  const mockAppsImportService = {
+    importManifest: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AppsRuntimeController],
@@ -51,6 +56,10 @@ describe('AppsRuntimeController', () => {
         {
           provide: OrchestratorService,
           useValue: mockOrchestratorService,
+        },
+        {
+          provide: AppsImportService,
+          useValue: mockAppsImportService,
         },
       ],
     }).compile();
