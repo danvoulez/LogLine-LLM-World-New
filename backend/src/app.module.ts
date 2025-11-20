@@ -10,11 +10,16 @@ import { Step } from './runs/entities/step.entity';
 import { Event } from './runs/entities/event.entity';
 import { Tool } from './tools/entities/tool.entity';
 import { Agent } from './agents/entities/agent.entity';
+import { App } from './apps/entities/app.entity';
+import { AppScope } from './apps/entities/app-scope.entity';
+import { AppWorkflow } from './apps/entities/app-workflow.entity';
+import { AppAction } from './apps/entities/app-action.entity';
 import { SetupPgVectorService } from './database/setup-pgvector.service';
 import { DatabaseController } from './database/database.controller';
 import { LlmModule } from './llm/llm.module';
 import { ToolsModule } from './tools/tools.module';
 import { AgentsModule } from './agents/agents.module';
+import { AppsModule } from './apps/apps.module';
 import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
@@ -26,7 +31,7 @@ function getDatabaseConfig() {
     return {
       type: 'postgres' as const,
       url: process.env.POSTGRES_URL,
-      entities: [Workflow, Run, Step, Event, Tool, Agent],
+      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
       // Vercel Postgres requires SSL in production
@@ -81,6 +86,7 @@ function getDatabaseConfig() {
     LlmModule,
     ToolsModule,
     AgentsModule,
+    AppsModule,
   ],
   controllers: [AppController, DatabaseController],
   providers: [AppService, SetupPgVectorService],
