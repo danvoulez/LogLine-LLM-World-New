@@ -1217,14 +1217,40 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 
 ## References & Documentation
 
+### Core Design & Philosophy
+
+- [LLM-First Design Review](./docs/design/LLM_FIRST_DESIGN_REVIEW.md) - LLM-first design compliance review
+- [AI Partner Philosophy](./docs/design/AI_PARTNER_PHILOSOPHY.md) - Dignified AI partnership principles
+- [Dignified AI Partnership Implementation](./docs/design/DIGNIFIED_AI_PARTNERSHIP_IMPLEMENTATION.md) - Implementation details
+- [Codebase Review 2024](./CODEBASE_REVIEW_2024.md) - Comprehensive codebase review
+
+### Structured Data & Context
+
+- [JSON✯Atomic Analysis](./docs/design/JSON_ATOMIC_ANALYSIS.md) - JSON✯Atomic format analysis
+- [JSON✯Atomic Implementation Plan](./docs/implementation/JSON_ATOMIC_IMPLEMENTATION_PLAN.md) - Implementation plan
+- [JSON✯Atomic Phase 1 Complete](./docs/implementation/JSON_ATOMIC_PHASE1_COMPLETE.md) - Phase 1 completion
+- [JSON✯Atomic Phase 2 Complete](./docs/implementation/JSON_ATOMIC_PHASE2_COMPLETE.md) - Phase 2 completion
+
+### Natural Language Structuring
+
+- [TDLN-T Protocol Analysis](./docs/design/TDLN_T_PROTOCOL_ANALYSIS.md) - TDLN-T protocol analysis
+- [TDLN-T Refocus](./docs/implementation/TDLN_T_REFOCUS.md) - Refocus to Natural Language → JSON✯Atomic
+- [TDLN-T Refocus Complete](./docs/implementation/TDLN_T_REFOCUS_COMPLETE.md) - Implementation complete
+- [TDLN-T Phase 1 Complete](./docs/implementation/TDLN_T_PHASE1_COMPLETE.md) - Phase 1 completion
+
 ### Implementation Guides
 
-- [CRITICAL_VERCEL_CONSIDERATIONS.md](./CRITICAL_VERCEL_CONSIDERATIONS.md) - Serverless constraints and solutions
-- [PHASE1.5_SERVERLESS_OPTIMIZATIONS.md](./PHASE1.5_SERVERLESS_OPTIMIZATIONS.md) - Phase 1.5 implementation details
 - [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md) - AI SDK v5 integration
 - [PHASE4_RAG_MEMORY_INTEGRATION.md](./PHASE4_RAG_MEMORY_INTEGRATION.md) - RAG Memory Engine
 - [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) - Vercel deployment guide
 - [backend/AI_SDK_QUICK_START.md](./backend/AI_SDK_QUICK_START.md) - AI SDK quick reference
+
+### Architecture & Frontend
+
+- [Frontend App Guidelines](./docs/architecture/FRONTEND_APP_GUIDELINES.md) - Frontend app development guidelines
+- [Mobile iPhone Architecture](./docs/architecture/MOBILE_IPHONE_ARCHITECTURE.md) - Mobile-first architecture
+- [Agent UI Architecture](./docs/architecture/AGENT_UI_ARCHITECTURE.md) - Agent UI architecture
+- [File Operations Architecture](./docs/architecture/FILE_OPERATIONS_ARCHITECTURE.md) - File operations design
 
 ### External Resources
 
