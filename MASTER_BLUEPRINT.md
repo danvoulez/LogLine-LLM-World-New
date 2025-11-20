@@ -734,7 +734,7 @@ An **App** is declared via a manifest. Backend imports it into DB.
 * `GET /runs/:id/events`
   → array of events sorted by timestamp.
 
-* `GET /runs/:id/stream` (Phase 2)
+* `GET /runs/:id/stream` (Phase 1.5) - Server-Sent Events for real-time updates
   → Server-Sent Events stream of run progress
 
 ### Tools
@@ -946,6 +946,36 @@ See [VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) for detailed deployme
 **Done when:**
 You can deploy to Vercel, hit a public endpoint to start a run, and see its trace via API.
 
+### Phase 1.5 – Serverless Optimizations (✅ COMPLETE)
+
+**Goal:** Optimize for Vercel serverless constraints (timeouts, cold starts, security).
+
+1. ✅ Async Workflow Execution:
+   * `POST /workflows/:id/runs` returns immediately (no timeout risk)
+   * Workflows execute in background
+   * Status polling via `GET /runs/:id`
+
+2. ✅ Streaming Support:
+   * `GET /runs/:id/stream` - Server-Sent Events (SSE) for real-time updates
+   * Enables monitoring long-running workflows without polling
+
+3. ✅ Security for Natural Language DB Tools:
+   * Dry-run mode (default) - preview SQL before execution
+   * SQL validation - blocks destructive operations (DELETE, DROP, TRUNCATE, ALTER)
+   * Explicit confirmation required for writes
+   * Transaction support
+
+4. ⚠️ Drizzle ORM Evaluation:
+   * Documented migration path for better cold-start performance
+   * Decision: Defer to Phase 2 evaluation (TypeORM works, just slower)
+
+**Done when:**
+- Workflows execute asynchronously (no timeout risk)
+- Real-time updates available via streaming
+- Security measures documented for Phase 2 DB tools
+
+**See:** [CRITICAL_VERCEL_CONSIDERATIONS.md](./CRITICAL_VERCEL_CONSIDERATIONS.md) and [PHASE1.5_SERVERLESS_OPTIMIZATIONS.md](./PHASE1.5_SERVERLESS_OPTIMIZATIONS.md)
+
 ### Phase 2 – Agents, Tools & LLM Integration
 
 **Goal:** Runs now use **real tools** and **agents** powered by an LLM.
@@ -1078,6 +1108,8 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 
 ### Implementation Guides
 
+- [CRITICAL_VERCEL_CONSIDERATIONS.md](./CRITICAL_VERCEL_CONSIDERATIONS.md) - Serverless constraints and solutions
+- [PHASE1.5_SERVERLESS_OPTIMIZATIONS.md](./PHASE1.5_SERVERLESS_OPTIMIZATIONS.md) - Phase 1.5 implementation details
 - [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md) - AI SDK v5 integration
 - [PHASE4_RAG_MEMORY_INTEGRATION.md](./PHASE4_RAG_MEMORY_INTEGRATION.md) - RAG Memory Engine
 - [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) - Vercel deployment guide
