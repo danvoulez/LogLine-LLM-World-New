@@ -33,6 +33,9 @@ async function createApp(): Promise<express.Application> {
     credentials: true,
   });
 
+  // Set global prefix for API versioning (same as main.ts)
+  app.setGlobalPrefix('api/v1');
+
   await app.init();
   cachedApp = expressApp;
   return expressApp;
