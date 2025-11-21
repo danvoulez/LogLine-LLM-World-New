@@ -81,7 +81,7 @@ This directory contains all documentation for the LogLine LLM World platform.
 3. [Environment Variables](./guides/ENV_VARIABLES.md)
 
 ### 🏗️ Architect
-1. [Master Blueprint](../MASTER_BLUEPRINT.md)
+1. [Master Blueprint](./MASTER_BLUEPRINT.md)
 2. [Design Principles](./design/)
 3. [Architecture Docs](./architecture/)
 
@@ -92,8 +92,8 @@ This directory contains all documentation for the LogLine LLM World platform.
 
 ### 🚀 DevOps
 1. [Deployment Guides](./deployment/)
-2. [Database Setup](../DATABASE_INITIALIZATION.md)
-3. [Stability Analysis](../STABILITY_ANALYSIS.md)
+2. [Database Setup](./guides/DATABASE_INITIALIZATION.md)
+3. [Stability Analysis](./status/STABILITY_ANALYSIS.md)
 
 ---
 
