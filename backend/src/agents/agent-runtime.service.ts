@@ -275,7 +275,7 @@ export class AgentRuntimeService {
     // Store agent decision/conclusion as long-term memory (if significant)
     // This helps future agents learn from past decisions
     try {
-      if (result.text && result.text.length > 50) {
+      if (result.text && result.text.length > 50 && context.runId) {
         // Only store if the response is substantial
         await this.memoryService.storeMemory({
           owner_type: 'run',
@@ -416,15 +416,17 @@ export class AgentRuntimeService {
       }
 
       // Search by agent context
-      memoryQueries.push(
-        this.memoryService.searchMemory({
-          query: agent.instructions || agent.name,
-          owner_type: 'agent',
-          owner_id: agent.id,
-          limit: 5,
-          threshold: 0.7,
-        }),
-      );
+      if (agent.id) {
+        memoryQueries.push(
+          this.memoryService.searchMemory({
+            query: agent.instructions || agent.name || 'agent context',
+            owner_type: 'agent',
+            owner_id: agent.id,
+            limit: 5,
+            threshold: 0.7,
+          }),
+        );
+      }
 
       // Search by tenant context (if available)
       if (context.tenantId) {
@@ -509,8 +511,12 @@ export class AgentRuntimeService {
 
 ${relevantMemories
   .map(
-    (m, idx) =>
-      `${idx + 1}. [${m.type}] ${m.content.substring(0, 200)}${m.content.length > 200 ? '...' : ''} (similarity: ${(m.similarity * 100).toFixed(1)}%)`,
+    (m, idx) => {
+      const content = m.content || '';
+      const type = m.type || 'unknown';
+      const similarity = typeof m.similarity === 'number' ? m.similarity : parseFloat(m.similarity || '0');
+      return `${idx + 1}. [${type}] ${content.substring(0, 200)}${content.length > 200 ? '...' : ''} (similarity: ${(similarity * 100).toFixed(1)}%)`;
+    },
   )
   .join('\n')}
 
