@@ -15,15 +15,16 @@ This directory contains all documentation for the LogLine LLM World platform.
 ## 📚 Documentation Structure
 
 ### 🏛️ Core Documents
-- **[../MASTER_BLUEPRINT.md](../MASTER_BLUEPRINT.md)** - Complete system specification (v2.6)
-- **[../CODEBASE_REVIEW.md](../CODEBASE_REVIEW.md)** - Codebase review and security analysis
-- **[../STABILITY_ANALYSIS.md](../STABILITY_ANALYSIS.md)** - System stability status
+- **[MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md)** - Complete system specification (v2.6)
+- **[CODEBASE_REVIEW.md](./CODEBASE_REVIEW.md)** - Codebase review and security analysis
+- **[status/STABILITY_ANALYSIS.md](./status/STABILITY_ANALYSIS.md)** - System stability status
 - **[DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md)** - **Complete documentation index**
 
 ### 🚀 Getting Started
 - **[guides/GETTING_STARTED.md](./guides/GETTING_STARTED.md)** - Development setup guide
 - **[guides/ENV_VARIABLES.md](./guides/ENV_VARIABLES.md)** - Environment variables reference
-- **[../DATABASE_INITIALIZATION.md](../DATABASE_INITIALIZATION.md)** - Database setup
+- **[guides/DATABASE_INITIALIZATION.md](./guides/DATABASE_INITIALIZATION.md)** - Database setup
+- **[guides/LLM_KEY_SETUP.md](./guides/LLM_KEY_SETUP.md)** - LLM key configuration
 - **[../README.md](../README.md)** - Project overview
 
 ### 📋 API & Reference

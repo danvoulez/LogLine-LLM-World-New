@@ -253,7 +253,7 @@ Event Logging
 ---
 
 **For detailed specifications, see:**
-- [Master Blueprint](../MASTER_BLUEPRINT.md)
+- [Master Blueprint](./MASTER_BLUEPRINT.md)
 - [API Reference](./API_MENU.md)
 - [Architecture Docs](./architecture/)
 

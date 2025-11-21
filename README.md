@@ -162,9 +162,10 @@ See [docs/guides/ENV_VARIABLES.md](./docs/guides/ENV_VARIABLES.md) for complete 
 ## 📚 Documentation
 
 ### Core Documentation
-- **[MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md)** - Complete system specification (v2.4)
-- **[CODEBASE_REVIEW.md](./CODEBASE_REVIEW.md)** - Codebase review and principles verification
-- **[docs/README.md](./docs/README.md)** - Complete documentation index
+- **[docs/MASTER_BLUEPRINT.md](./docs/MASTER_BLUEPRINT.md)** - Complete system specification (v2.6)
+- **[docs/CODEBASE_REVIEW.md](./docs/CODEBASE_REVIEW.md)** - Codebase review and principles verification
+- **[docs/DOCUMENTATION_INDEX.md](./docs/DOCUMENTATION_INDEX.md)** - Complete documentation index
+- **[docs/README.md](./docs/README.md)** - Documentation overview
 
 ### Quick Links
 - **[docs/guides/](./docs/guides/)** - Developer guides (AI SDK, Environment Variables, Deployment)
@@ -447,10 +448,10 @@ UNLICENSED
 
 ## 🔗 Links
 
-- **Blueprint**: [MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md)
-- **Codebase Review**: [CODEBASE_REVIEW.md](./CODEBASE_REVIEW.md)
-- **Documentation**: [docs/README.md](./docs/README.md)
-- **API Reference**: See [MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md#8-http-api-reference-mvp)
+- **Blueprint**: [docs/MASTER_BLUEPRINT.md](./docs/MASTER_BLUEPRINT.md)
+- **Codebase Review**: [docs/CODEBASE_REVIEW.md](./docs/CODEBASE_REVIEW.md)
+- **Documentation Index**: [docs/DOCUMENTATION_INDEX.md](./docs/DOCUMENTATION_INDEX.md)
+- **API Reference**: See [docs/API_MENU.md](./docs/API_MENU.md)
 
 ---
 

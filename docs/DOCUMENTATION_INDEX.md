@@ -21,24 +21,24 @@
 ### 🏛️ Core Architecture
 
 #### Master Documents
-- **[../MASTER_BLUEPRINT.md](../MASTER_BLUEPRINT.md)** - Complete system specification (v2.6)
+- **[MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md)** - Complete system specification (v2.6)
   - Architecture overview
   - Data models and schemas
   - Implementation roadmap
   - Phase completion status
 
-- **[../CODEBASE_REVIEW.md](../CODEBASE_REVIEW.md)** - Codebase review and security analysis
+- **[CODEBASE_REVIEW.md](./CODEBASE_REVIEW.md)** - Codebase review and security analysis
   - Security vulnerabilities identified
   - Multi-tenant isolation fixes
   - Policy engine improvements
 
-- **[../STABILITY_ANALYSIS.md](../STABILITY_ANALYSIS.md)** - System stability status
+- **[status/STABILITY_ANALYSIS.md](./status/STABILITY_ANALYSIS.md)** - System stability status
   - Circuit breaker implementation
   - Graceful shutdown
   - Health check robustness
 
 #### Registry Universal
-- **[../REGISTRY.md](../REGISTRY.md)** - Registry Universal overview
+- **[design/REGISTRY.md](./design/REGISTRY.md)** - Registry Universal overview
 - **[design/REGISTRY_UNIVERSAL_PROPOSAL.md](./design/REGISTRY_UNIVERSAL_PROPOSAL.md)** - Complete Registry specification
 - **[design/REGISTRY_PROPOSAL.md](./design/REGISTRY_PROPOSAL.md)** - Initial Registry proposal
 
@@ -49,11 +49,12 @@
 #### Setup & Installation
 - **[../README.md](../README.md)** - Project overview and quick start
 - **[guides/ENV_VARIABLES.md](./guides/ENV_VARIABLES.md)** - Environment variables reference
-- **[../DATABASE_INITIALIZATION.md](../DATABASE_INITIALIZATION.md)** - Database setup guide
-- **[backend/MIGRATION_CONSOLIDATION.md](../backend/MIGRATION_CONSOLIDATION.md)** - Migration consolidation guide
+- **[guides/DATABASE_INITIALIZATION.md](./guides/DATABASE_INITIALIZATION.md)** - Database setup guide
+- **[guides/LLM_KEY_SETUP.md](./guides/LLM_KEY_SETUP.md)** - LLM key configuration guide
+- **[../backend/MIGRATION_CONSOLIDATION.md](../backend/MIGRATION_CONSOLIDATION.md)** - Migration consolidation guide
 
 #### Frontend
-- **[../FRONTEND_STATUS.md](../FRONTEND_STATUS.md)** - Frontend implementation status
+- **[status/FRONTEND_STATUS.md](./status/FRONTEND_STATUS.md)** - Frontend implementation status
 - **[../logline-ui/README.md](../logline-ui/README.md)** - Frontend README
 - **[../logline-ui/FRONTEND_CHECKLIST.md](../logline-ui/FRONTEND_CHECKLIST.md)** - Frontend testing checklist
 - **[../logline-ui/PWA_SETUP.md](../logline-ui/PWA_SETUP.md)** - PWA setup for iPhone 16
@@ -139,12 +140,12 @@
 - **[deployment/VERCEL_DEPLOYMENT.md](./deployment/VERCEL_DEPLOYMENT.md)** - Vercel deployment guide
 - **[deployment/VERCEL_CLI_SETUP.md](./deployment/VERCEL_CLI_SETUP.md)** - Vercel CLI setup
 - **[deployment/VERCEL_AUTO_DEPLOY_FIX.md](./deployment/VERCEL_AUTO_DEPLOY_FIX.md)** - Auto-deploy fix
-- **[../VERCEL_DEPLOY_FIX.md](../VERCEL_DEPLOY_FIX.md)** - Deployment fix documentation
-- **[../VERCEL_DEPLOY_DIAGNOSTIC.md](../VERCEL_DEPLOY_DIAGNOSTIC.md)** - Deployment diagnostics
-- **[../VERCEL_FIX.md](../VERCEL_FIX.md)** - Vercel fix details
+- **[deployment/VERCEL_DEPLOY_FIX.md](./deployment/VERCEL_DEPLOY_FIX.md)** - Deployment fix documentation
+- **[deployment/VERCEL_DEPLOY_DIAGNOSTIC.md](./deployment/VERCEL_DEPLOY_DIAGNOSTIC.md)** - Deployment diagnostics
+- **[deployment/VERCEL_FIX.md](./deployment/VERCEL_FIX.md)** - Vercel fix details
 
 #### Railway (Executor)
-- **[../DEPLOY_VIA_GITHUB.md](../DEPLOY_VIA_GITHUB.md)** - GitHub Actions deployment
+- **[deployment/DEPLOY_VIA_GITHUB.md](./deployment/DEPLOY_VIA_GITHUB.md)** - GitHub Actions deployment
 
 ---
 
@@ -162,7 +163,7 @@
 
 - **[testing/TEST_COVERAGE_IMPROVEMENTS.md](./testing/TEST_COVERAGE_IMPROVEMENTS.md)** - Test coverage improvements
 - **[testing/TEST_FIXES_COMPLETE.md](./testing/TEST_FIXES_COMPLETE.md)** - Test fixes completion
-- **[../TEST_FRONTEND_README.md](../TEST_FRONTEND_README.md)** - Frontend testing guide
+- **[testing/TEST_FRONTEND_README.md](./testing/TEST_FRONTEND_README.md)** - Frontend testing guide
 
 ---
 
@@ -171,9 +172,9 @@
 #### Feature Status
 - **[status/POLICY_ENGINE_STATUS.md](./status/POLICY_ENGINE_STATUS.md)** - Policy engine status
 - **[status/TDLN_T_LIMITATIONS.md](./status/TDLN_T_LIMITATIONS.md)** - TDLN-T current limitations
-- **[../STABILITY_ANALYSIS.md](../STABILITY_ANALYSIS.md)** - System stability analysis
-- **[../STABILITY_FIXES_APPLIED.md](../STABILITY_FIXES_APPLIED.md)** - Stability fixes applied
-- **[../PRIORITY_FIXES.md](../PRIORITY_FIXES.md)** - Priority fixes document
+- **[status/STABILITY_ANALYSIS.md](./status/STABILITY_ANALYSIS.md)** - System stability analysis
+- **[status/STABILITY_FIXES_APPLIED.md](./status/STABILITY_FIXES_APPLIED.md)** - Stability fixes applied
+- **[status/PRIORITY_FIXES.md](./status/PRIORITY_FIXES.md)** - Priority fixes document
 
 #### Technology Analysis
 - **[analysis/TECHNOLOGY_REVIEW_2024.md](./analysis/TECHNOLOGY_REVIEW_2024.md)** - Technology review 2024
@@ -193,11 +194,11 @@
 ### Registry Universal
 - [Registry Universal Proposal](./design/REGISTRY_UNIVERSAL_PROPOSAL.md)
 - [Registry Proposal](./design/REGISTRY_PROPOSAL.md)
-- [Registry Overview](../REGISTRY.md)
+- [Registry Overview](./design/REGISTRY.md)
 - [API Endpoints](./API_MENU.md#2-registry-universal)
 
 ### Frontend & UI
-- [Frontend Status](../FRONTEND_STATUS.md)
+- [Frontend Status](./status/FRONTEND_STATUS.md)
 - [Frontend Checklist](../logline-ui/FRONTEND_CHECKLIST.md)
 - [PWA Setup](../logline-ui/PWA_SETUP.md)
 - [Agent UI Architecture](./architecture/AGENT_UI_ARCHITECTURE.md)
@@ -215,9 +216,9 @@
 - [Executor API Spec](./architecture/EXECUTOR_SPEC.md)
 
 ### Security & Governance
-- [Codebase Review](../CODEBASE_REVIEW.md)
+- [Codebase Review](./CODEBASE_REVIEW.md)
 - [Policy Engine Status](./status/POLICY_ENGINE_STATUS.md)
-- [Stability Analysis](../STABILITY_ANALYSIS.md)
+- [Stability Analysis](./status/STABILITY_ANALYSIS.md)
 
 ### Data Formats
 - [JSON✯Atomic Analysis](./design/JSON_ATOMIC_ANALYSIS.md)
@@ -225,7 +226,7 @@
 
 ### Deployment
 - [Vercel Deployment](./deployment/VERCEL_DEPLOYMENT.md)
-- [Database Initialization](../DATABASE_INITIALIZATION.md)
+- [Database Initialization](./guides/DATABASE_INITIALIZATION.md)
 - [Migration Consolidation](../backend/MIGRATION_CONSOLIDATION.md)
 
 ---
