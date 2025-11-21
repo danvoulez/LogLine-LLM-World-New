@@ -371,6 +371,76 @@ export class AgentRuntimeService {
       console.warn('Failed to build atomic context, falling back to natural language:', error);
     }
 
+    // Retrieve relevant memories for context
+    let relevantMemories: any[] = [];
+    try {
+      // Search for memories related to the current run/agent/tenant
+      const memoryQueries: Promise<any[]>[] = [];
+      
+      // Search by run context
+      if (context.runId) {
+        memoryQueries.push(
+          this.memoryService.searchMemory({
+            query: typeof input === 'string' ? input : JSON.stringify(input || {}),
+            owner_type: 'run',
+            owner_id: context.runId,
+            limit: 5,
+            threshold: 0.7,
+          }),
+        );
+      }
+
+      // Search by agent context
+      memoryQueries.push(
+        this.memoryService.searchMemory({
+          query: agent.instructions || agent.name,
+          owner_type: 'agent',
+          owner_id: agent.id,
+          limit: 5,
+          threshold: 0.7,
+        }),
+      );
+
+      // Search by tenant context (if available)
+      if (context.tenantId) {
+        memoryQueries.push(
+          this.memoryService.searchMemory({
+            query: typeof input === 'string' ? input : JSON.stringify(input || {}),
+            owner_type: 'tenant',
+            owner_id: context.tenantId,
+            limit: 3,
+            threshold: 0.7,
+          }),
+        );
+      }
+
+      if (memoryQueries.length > 0) {
+        const memoryResults = await Promise.all(memoryQueries);
+        // Flatten and deduplicate by memory_id, then sort by similarity
+        const memoryMap = new Map<string, any>();
+        for (const result of memoryResults) {
+          if (Array.isArray(result)) {
+            for (const memory of result) {
+              if (!memoryMap.has(memory.memory_id)) {
+                memoryMap.set(memory.memory_id, memory);
+              } else {
+                // Keep the one with higher similarity
+                const existing = memoryMap.get(memory.memory_id);
+                if (memory.similarity > existing.similarity) {
+                  memoryMap.set(memory.memory_id, memory);
+                }
+              }
+            }
+          }
+        }
+        relevantMemories = Array.from(memoryMap.values())
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 10); // Limit to top 10
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to retrieve memories for agent context: ${error.message}`);
+    }
+
     // Refract input text to JSON✯Atomic format (if it's a string)
     // This structures natural language for better LLM understanding
     let refractedInput: any = input;
