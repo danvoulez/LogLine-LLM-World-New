@@ -10,6 +10,7 @@ import { ContextSummarizerService } from '../agents/context-summarizer.service';
 import { AtomicEventConverterService } from '../agents/atomic-event-converter.service';
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 import { BudgetTrackerService } from './budget-tracker.service';
+import { ScopeDeniedException } from '../common/exceptions/scope-denied.exception';
 
 @Injectable()
 export class OrchestratorService {

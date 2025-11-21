@@ -11,8 +11,8 @@ export class PolicyConditionDto {
   @IsNotEmpty()
   operator: PolicyOperator;
 
-  @IsOptional()
-  value?: any;
+  // Value is optional for 'exists' and 'not_exists' operators, but required for others
+  value: any;
 }
 
 export class PolicyRuleExprDto implements PolicyRuleExpr {
