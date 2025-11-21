@@ -248,23 +248,28 @@ describe('Memory Engine Integration', () => {
     it('should handle search across 100+ memories efficiently', async () => {
       const ownerId = 'perf-test-user';
       
-      // Create 100 memories
-      const promises = Array.from({ length: 100 }, (_, i) =>
-        memoryService.storeMemory({
-          owner_type: 'user',
-          owner_id: ownerId,
-          type: 'long_term',
-          content: `Memory item ${i}: This is test content about topic ${i % 10}`,
-          generateEmbedding: true,
-        }),
-      );
-
-      await Promise.all(promises);
+      // Create 100 memories in batches to avoid overwhelming the embedding service
+      const batchSize = 10;
+      const totalMemories = 100;
+      
+      for (let i = 0; i < totalMemories; i += batchSize) {
+        const batch = Array.from({ length: batchSize }, (_, j) => {
+          const index = i + j;
+          return memoryService.storeMemory({
+            owner_type: 'user',
+            owner_id: ownerId,
+            type: 'long_term',
+            content: `Memory item ${index}: This is test content about topic ${index % 10}. The content includes various keywords and phrases for semantic search testing.`,
+            generateEmbedding: true,
+          });
+        });
+        await Promise.all(batch);
+      }
 
       // Perform search
       const startTime = Date.now();
       const results = await memoryService.searchMemory({
-        query: 'test content topic',
+        query: 'test content topic semantic search',
         owner_type: 'user',
         owner_id: ownerId,
         limit: 10,
@@ -272,31 +277,46 @@ describe('Memory Engine Integration', () => {
       });
       const endTime = Date.now();
 
+      const searchTime = endTime - startTime;
+      
       expect(results.length).toBeLessThanOrEqual(10);
-      expect(endTime - startTime).toBeLessThan(5000); // Should complete in < 5 seconds
+      expect(searchTime).toBeLessThan(5000); // Should complete in < 5 seconds
+      
+      // Log performance metrics
+      console.log(`Performance: Searched across ${totalMemories} memories in ${searchTime}ms`);
+      console.log(`Average time per memory: ${(searchTime / totalMemories).toFixed(2)}ms`);
     });
 
     it('should handle concurrent memory operations', async () => {
       const ownerId = 'concurrent-test-user';
 
-      // Concurrent store operations
-      const storePromises = Array.from({ length: 20 }, (_, i) =>
-        memoryService.storeMemory({
-          owner_type: 'user',
-          owner_id: ownerId,
-          type: 'long_term',
-          content: `Concurrent memory ${i}`,
-          generateEmbedding: true,
-        }),
-      );
+      // Concurrent store operations (in smaller batches to avoid rate limits)
+      const batchSize = 5;
+      const totalStores = 20;
+      const allMemories = [];
 
-      const memories = await Promise.all(storePromises);
-      expect(memories.length).toBe(20);
+      for (let i = 0; i < totalStores; i += batchSize) {
+        const batch = Array.from({ length: batchSize }, (_, j) => {
+          const index = i + j;
+          return memoryService.storeMemory({
+            owner_type: 'user',
+            owner_id: ownerId,
+            type: 'long_term',
+            content: `Concurrent memory ${index}: This is concurrent test content for performance testing.`,
+            generateEmbedding: true,
+          });
+        });
+        const batchResults = await Promise.all(batch);
+        allMemories.push(...batchResults);
+      }
+
+      expect(allMemories.length).toBe(20);
 
       // Concurrent search operations
+      const startTime = Date.now();
       const searchPromises = Array.from({ length: 10 }, () =>
         memoryService.searchMemory({
-          query: 'concurrent memory',
+          query: 'concurrent memory test',
           owner_type: 'user',
           owner_id: ownerId,
           limit: 5,
@@ -305,10 +325,49 @@ describe('Memory Engine Integration', () => {
       );
 
       const searchResults = await Promise.all(searchPromises);
+      const endTime = Date.now();
+      const concurrentSearchTime = endTime - startTime;
+
       expect(searchResults.length).toBe(10);
       searchResults.forEach((results) => {
         expect(Array.isArray(results)).toBe(true);
       });
+
+      // Log performance metrics
+      console.log(`Performance: 10 concurrent searches completed in ${concurrentSearchTime}ms`);
+      console.log(`Average time per concurrent search: ${(concurrentSearchTime / 10).toFixed(2)}ms`);
+    });
+
+    it('should handle large content with chunking efficiently', async () => {
+      const ownerId = 'chunking-perf-test';
+      const largeContent = 'x'.repeat(10000); // 10KB content
+      
+      const startTime = Date.now();
+      const memory = await memoryService.storeMemory({
+        owner_type: 'user',
+        owner_id: ownerId,
+        type: 'long_term',
+        content: largeContent,
+        generateEmbedding: true,
+      });
+      const endTime = Date.now();
+
+      const storeTime = endTime - startTime;
+
+      expect(memory.id).toBeDefined();
+      
+      // Verify resources were created for chunks
+      const resources = await dataSource.query(
+        'SELECT * FROM resources WHERE memory_item_id = $1',
+        [memory.id],
+      );
+      
+      expect(resources.length).toBeGreaterThan(1); // Should be chunked
+      expect(storeTime).toBeLessThan(10000); // Should complete in < 10 seconds
+
+      // Log performance metrics
+      console.log(`Performance: Stored and chunked ${largeContent.length} chars in ${storeTime}ms`);
+      console.log(`Chunks created: ${resources.length}`);
     });
   });
 });
