@@ -808,9 +808,62 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
     const toolInput = node.config?.input || run.input || {};
 
     // Execute tool
-    const result = await this.toolRuntime.callTool(toolId, toolInput, context);
+    try {
+      const result = await this.toolRuntime.callTool(toolId, toolInput, context);
+      return result;
+    } catch (error: any) {
+      // Check if error is due to require_approval
+      if (error instanceof ScopeDeniedException && error.message.includes('requires approval')) {
+        // Pause the run and mark step as pending (waiting for approval)
+        this.logger.warn(`Run ${runId} paused: tool call requires approval`, {
+          stepId,
+          nodeId: node.id,
+          error: error.message,
+        });
 
-    return result;
+        // Update step status to pending (waiting for approval)
+        const step = await this.stepRepository.findOne({ where: { id: stepId } });
+        if (step) {
+          step.status = StepStatus.PENDING; // Keep as pending (waiting for approval)
+          step.output = {
+            error: 'requires_approval',
+            message: error.message,
+            paused_at: new Date().toISOString(),
+          };
+          await this.stepRepository.save(step);
+        }
+
+        // Update run status to paused
+        run.status = RunStatus.PAUSED;
+        run.result = {
+          paused: true,
+          reason: 'tool_call_requires_approval',
+          step_id: stepId,
+          node_id: node.id,
+          message: error.message,
+        };
+        await this.runRepository.save(run);
+
+        // Log event
+        await this.eventRepository.save({
+          run_id: runId,
+          step_id: stepId,
+          kind: EventKind.ERROR,
+          payload: {
+            error: 'requires_approval',
+            message: error.message,
+            step_id: stepId,
+            node_id: node.id,
+          },
+        });
+
+        // Throw error to stop execution
+        throw error;
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   private mapNodeTypeToStepType(nodeType: string): StepType {

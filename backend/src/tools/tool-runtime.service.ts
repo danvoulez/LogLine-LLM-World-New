@@ -158,30 +158,6 @@ export class ToolRuntimeService {
       });
     }
 
-      // Policy check (Policy Engine v0 - minimal rules before Phase 4)
-      const policyDecision = await this.policyEngine.checkToolCall(toolId, {
-        runId: context.runId,
-        appId: context.appId,
-        userId: context.userId,
-        tenantId: context.tenantId,
-      });
-
-      if (!policyDecision.allowed) {
-        this.logger.warn(
-          `Policy denied tool call: ${toolId}`,
-          {
-            toolId,
-            runId: context.runId,
-            appId: context.appId,
-            reason: policyDecision.reason,
-          },
-        );
-
-        throw new Error(
-          `Policy denied: ${policyDecision.reason || 'Tool call not allowed'}`,
-        );
-      }
-
     // Input validation using tool.input_schema
     let validatedInput = input;
     if (tool.input_schema && typeof tool.input_schema === 'object') {

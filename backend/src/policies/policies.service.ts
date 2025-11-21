@@ -16,7 +16,11 @@ export class PoliciesService {
     // Validate rule_expr structure
     this.validateRuleExpr(createPolicyDto.rule_expr);
 
-    const policy = this.policyRepository.create(createPolicyDto);
+    const policy = this.policyRepository.create({
+      ...createPolicyDto,
+      priority: createPolicyDto.priority ?? 100,
+      enabled: createPolicyDto.enabled ?? true,
+    });
     return this.policyRepository.save(policy);
   }
 
