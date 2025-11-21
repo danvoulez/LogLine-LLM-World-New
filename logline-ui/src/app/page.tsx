@@ -10,13 +10,23 @@ export default function AgentOS() {
   const [prompt, setPrompt] = useState("Show me the system status");
   const [layout, setLayout] = useState<UILayout | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleExecute = async () => {
+    if (!prompt.trim()) return;
+    
     setLoading(true);
-    // In real app: POST to /api/v1/render with prompt
-    const result = await fetchLayoutForIntent(prompt);
-    setLayout(result);
-    setLoading(false);
+    setError(null);
+    
+    try {
+      const result = await fetchLayoutForIntent(prompt);
+      setLayout(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load layout');
+      console.error('Error executing prompt:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Initial Load
@@ -52,7 +62,22 @@ export default function AgentOS() {
 
       {/* Dynamic Canvas */}
       <div className="flex-1 max-w-5xl mx-auto w-full p-6 space-y-6">
-        {layout && (
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <Sparkles className="h-8 w-8 animate-spin text-blue-500" />
+              <p className="text-sm text-gray-500">Generating layout...</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && layout && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-800">{layout.title}</h2>
@@ -63,6 +88,12 @@ export default function AgentOS() {
             {layout.components.map((comp) => (
               <AtomicRenderer key={comp.id} component={comp} />
             ))}
+          </div>
+        )}
+
+        {!loading && !error && !layout && (
+          <div className="text-center py-12 text-gray-400">
+            <p>Enter a prompt above to generate a layout</p>
           </div>
         )}
       </div>

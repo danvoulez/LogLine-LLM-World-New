@@ -21,7 +21,7 @@ export interface UILayout {
 
 export interface AtomicComponent {
   id: string;
-  type: 'Card' | 'Metric' | 'TraceRibbon' | 'ChatBubble' | 'ToolOutput' | 'PolicyBadge' | 'Table';
+  type: 'Card' | 'Metric' | 'TraceRibbon' | 'ChatBubble' | 'ToolOutput' | 'PolicyBadge' | 'Table' | 'Chart' | 'Badge' | 'Button' | 'Input' | 'Text';
   props: Record<string, any>;
   children?: AtomicComponent[];
   animation_delay?: number;
