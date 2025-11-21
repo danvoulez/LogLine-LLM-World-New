@@ -272,6 +272,31 @@ export class AgentRuntimeService {
       }
     }
 
+    // Store agent decision/conclusion as long-term memory (if significant)
+    // This helps future agents learn from past decisions
+    try {
+      if (result.text && result.text.length > 50) {
+        // Only store if the response is substantial
+        await this.memoryService.storeMemory({
+          owner_type: 'run',
+          owner_id: context.runId,
+          type: 'long_term',
+          content: `Agent ${agentId} decision: ${result.text.substring(0, 1000)}`,
+          metadata: {
+            agent_id: agentId,
+            step_id: context.stepId,
+            tool_calls: toolCalls.length || 0,
+            finish_reason: result.finishReason,
+          },
+          visibility: 'private',
+          generateEmbedding: true,
+        });
+      }
+    } catch (error) {
+      // Don't fail the agent execution if memory storage fails
+      this.logger.warn(`Failed to store agent memory: ${error.message}`);
+    }
+
     return {
       text: result.text,
       toolCalls,
