@@ -4,12 +4,6 @@
   "installCommand": "npm install",
   "framework": null,
   "outputDirectory": "dist",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
-    }
-  ],
   "crons": [
     {
       "path": "/api/v1/cron/check-alerts",
