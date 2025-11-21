@@ -19,6 +19,7 @@ import { RegistryTool } from '../registry/registry.tool';
 import { HttpTool } from './standard/http.tool';
 import { GithubTool } from './standard/github.tool';
 import { MathTool } from './standard/math.tool';
+import { CircuitBreaker } from '../common/utils/circuit-breaker.util';
 import * as crypto from 'crypto';
 
 export interface ToolContext {
@@ -45,6 +46,8 @@ export type ToolHandler = (input: any, ctx: ToolContext) => Promise<any>;
 export class ToolRuntimeService {
   private readonly logger = new Logger(ToolRuntimeService.name);
   private toolHandlers: Map<string, ToolHandler> = new Map();
+  // Circuit breaker for executor service (prevents cascading failures)
+  private executorCircuitBreaker = new CircuitBreaker(5, 60000, 'executor-service');
 
   constructor(
     @InjectRepository(Tool)
@@ -475,49 +478,68 @@ export class ToolRuntimeService {
       throw new Error(`Remote tool ${tool.id} missing URL in config`);
     }
 
-    // Get secret from environment (if configured)
-    const secret = secret_env ? process.env[secret_env] : undefined;
-    const timestamp = Date.now().toString();
-    
-    const payload = {
-      tool_id: tool.id,
-      input,
-      context,
-    };
+    // CRITICAL STABILITY: Use circuit breaker to prevent cascading failures
+    return this.executorCircuitBreaker.execute(async () => {
+      // Get secret from environment (if configured)
+      const secret = secret_env ? process.env[secret_env] : undefined;
+      const timestamp = Date.now().toString();
+      
+      const payload = {
+        tool_id: tool.id,
+        input,
+        context,
+      };
 
-    // We send the payload as JSON body
-    // The backend logic must match the executor auth middleware
-    // Executor expects JSON stringified body to match signature
-    const bodyString = JSON.stringify(payload);
+      // We send the payload as JSON body
+      // The backend logic must match the executor auth middleware
+      // Executor expects JSON stringified body to match signature
+      const bodyString = JSON.stringify(payload);
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-LogLine-Tool-Id': tool.id,
-      'X-LogLine-Timestamp': timestamp,
-    };
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-LogLine-Tool-Id': tool.id,
+        'X-LogLine-Timestamp': timestamp,
+      };
 
-    // Sign payload if secret is available
-    if (secret) {
-      const signature = crypto
-        .createHmac('sha256', secret)
-        .update(bodyString)
-        .digest('hex');
-      headers['X-LogLine-Signature'] = signature;
-    }
+      // Sign payload if secret is available
+      if (secret) {
+        const signature = crypto
+          .createHmac('sha256', secret)
+          .update(bodyString)
+          .digest('hex');
+        headers['X-LogLine-Signature'] = signature;
+      }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: bodyString,
+      // CRITICAL STABILITY: Add timeout to prevent hanging requests
+      const timeoutMs = 300000; // 5 minutes max for executor operations
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: bodyString,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Remote tool execution failed: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        return result;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error(`Remote tool execution timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+      }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Remote tool execution failed: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    return result;
   }
 
   registerTool(toolId: string, handler: ToolHandler) {
