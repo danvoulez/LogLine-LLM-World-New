@@ -6,7 +6,7 @@
   "outputDirectory": "backend/dist",
   "functions": {
     "backend/api/index.ts": {
-      "runtime": "@vercel/node"
+      "runtime": "nodejs20.x"
     }
   },
   "routes": [
