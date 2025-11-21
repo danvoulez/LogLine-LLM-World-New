@@ -22,5 +22,7 @@ jobs:
         working-directory: executor
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service logline-executor --detach
+          RAILWAY_VERBOSE: true
+        run: |
+          railway up --detach
 
