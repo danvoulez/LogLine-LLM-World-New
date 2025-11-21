@@ -1556,6 +1556,11 @@ You can define an app as a manifest, import it, open it in the UI, trigger actio
    * EmbeddingService (OpenAI, Anthropic, Google)
    * MemoryService with semantic search
    * Integration into agent context for RAG flows
+   * **Security**: Tenant/user/app ownership validation enforced in Memory tools:
+     * `owner_type='tenant'` → forces `owner_id` from `context.tenantId`
+     * `owner_type='user'` → forces `owner_id` from `context.userId`
+     * `owner_type='app'` → validates `owner_id` matches `context.appId`
+   * Prevents data exfiltration between tenants/users/apps
 
 2. **Policy Engine v1** ✅:
    * `policies` table with rule expressions
