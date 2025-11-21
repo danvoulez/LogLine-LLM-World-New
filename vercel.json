@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "buildCommand": "cd backend && npm run build",
+  "installCommand": "cd backend && npm install",
+  "framework": null,
+  "outputDirectory": "backend/dist",
+  "functions": {
+    "backend/api/index.ts": {
+      "runtime": "@vercel/node"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "backend/api/index.ts"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+
