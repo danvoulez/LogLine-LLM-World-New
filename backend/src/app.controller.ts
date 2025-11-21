@@ -62,7 +62,7 @@ export class AppController {
    * TODO: Implement full TDLN-T + LLM integration for dynamic layout generation
    * For now, returns mock data based on prompt keywords
    */
-  @Post('api/v1/render')
+  @Post('render')
   async renderLayout(@Body() body: { prompt: string }): Promise<{ layout: any }> {
     const { prompt } = body;
 
