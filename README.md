@@ -24,13 +24,23 @@ LogLine LLM World is a platform for building and orchestrating LLM-powered agent
 ```
 .
 ├── backend/              # NestJS backend API
-│   ├── src/
-│   │   ├── workflows/   # Workflow management
-│   │   ├── runs/        # Run execution & events
-│   │   └── execution/   # Orchestrator service
-│   └── api/             # Vercel serverless handler
-├── MASTER_BLUEPRINT.md  # Complete system specification
-└── README.md            # This file
+│   ├── src/              # Source code
+│   ├── api/              # Vercel serverless handler
+│   └── examples/         # Example app manifests
+├── docs/                 # Documentation
+│   ├── phases/           # Phase implementation docs
+│   ├── testing/          # Testing documentation
+│   ├── guides/           # Developer guides
+│   ├── architecture/     # Architecture docs
+│   ├── design/           # Design principles
+│   ├── implementation/   # Feature implementation
+│   ├── apps/             # App platform docs
+│   ├── deployment/       # Deployment docs
+│   ├── status/           # Feature status
+│   └── analysis/         # Technology analysis
+├── MASTER_BLUEPRINT.md   # Complete system specification (v2.4)
+├── CODEBASE_REVIEW.md    # Codebase review and principles
+└── README.md             # This file
 ```
 
 ## Quick Start
