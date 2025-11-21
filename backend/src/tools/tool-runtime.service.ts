@@ -11,6 +11,7 @@ import { ScopeDeniedException } from '../common/exceptions/scope-denied.exceptio
 import { SchemaValidatorService } from '../common/validators/schema-validator.service';
 import { AppScopeCheckerService } from '../apps/services/app-scope-checker.service';
 import { PolicyEngineV0Service } from '../policies/policy-engine-v0.service';
+import { PolicyEngineV1Service } from '../policies/policy-engine-v1.service';
 import { RetryUtil } from '../common/utils/retry.util';
 import { sanitizeForLogging } from '../common/utils/sanitize.util';
 import { MemoryTool } from './memory.tool';
@@ -39,7 +40,8 @@ export class ToolRuntimeService {
     private memoryTool: MemoryTool,
     private schemaValidator: SchemaValidatorService,
     private scopeChecker: AppScopeCheckerService,
-    private policyEngine: PolicyEngineV0Service,
+    private policyEngineV0: PolicyEngineV0Service,
+    private policyEngineV1: PolicyEngineV1Service,
   ) {
     this.registerBuiltinTools();
   }
