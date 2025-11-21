@@ -6,6 +6,7 @@ import { IdeasService } from './registry/ideas/ideas.service';
 import { PeopleService } from './registry/people/people.service';
 import { ObjectsService } from './registry/objects/objects.service';
 import { AgentsRegistryService } from './registry/agents/agents-registry.service';
+import { LlmRouterService } from './llm/llm-router.service';
 
 @Controller()
 export class AppController {
@@ -17,6 +18,7 @@ export class AppController {
     private readonly peopleService: PeopleService,
     private readonly objectsService: ObjectsService,
     private readonly agentsRegistryService: AgentsRegistryService,
+    private readonly llmRouter: LlmRouterService,
   ) {}
 
   @Get()
@@ -63,10 +65,10 @@ export class AppController {
    * For now, returns mock data based on prompt keywords
    */
   @Post('render')
-  async renderLayout(@Body() body: { prompt: string }): Promise<{ layout: any }> {
-    const { prompt } = body;
+  async renderLayout(@Body() body: { prompt: string; context?: any }): Promise<{ layout: any }> {
+    const { prompt, context } = body;
 
-    // Check for specific intents
+    // First, try keyword-based routing for known Registry intents (faster, more reliable)
     const lowerPrompt = prompt.toLowerCase();
     
     if (lowerPrompt.includes('contract') || lowerPrompt.includes('contrato')) {
@@ -89,11 +91,151 @@ export class AppController {
       return { layout: await this.generateAgentsLayout() };
     }
 
-    // TODO: Use TDLN-T to structure the prompt, then LLM to generate layout
-    // For now, return mock layout based on keywords
-    const layout = this.generateMockLayout(prompt);
+    // For other intents, use LLM to generate layout dynamically
+    try {
+      const layout = await this.generateLayoutWithLLM(prompt, context);
+      return { layout };
+    } catch (error) {
+      // Fallback to mock layout if LLM fails
+      console.warn('LLM layout generation failed, using mock layout:', error);
+      const layout = this.generateMockLayout(prompt);
+      return { layout };
+    }
+  }
 
-    return { layout };
+  private async generateLayoutWithLLM(prompt: string, context?: any): Promise<any> {
+    const systemPrompt = `# ROLE & OBJECTIVE
+
+You are the **LogLine Visual Cortex**. You are NOT a chatbot. You do not speak to the user.
+
+Your sole purpose is to translate **User Intent** (Natural Language) into a **Structural Blueprint** (JSON) that the LogLine OS Frontend will render.
+
+# THE PHILOSOPHY: "BEAUTIFUL NOTHING"
+
+1. **Silence is Default:** Do not render clutter. Only render what answers the specific intent.
+
+2. **Cinematic Reveal:** Use \`animation_delay\` to stagger components. They should flow onto the screen like a waterfall, not crash all at once.
+
+3. **Structure First:** You build the Mountain (Layout/Containers). The data (River) will flow into it later.
+
+# THE COMPONENT LIBRARY (Your Bricks)
+
+You may ONLY use these components. Do not hallucinate new ones.
+
+1. **SafeCard** (Container)
+   - \`type\`: "Card"
+   - \`props\`:
+     - \`title\` (string, optional): The header.
+     - \`variant\` (enum): "default" (clean), "glass" (highlight/transparent), "error" (red alert), "success" (green).
+     - \`className\` (string): Tailwind classes. Use \`grid grid-cols-X gap-4\` for layouts.
+
+2. **SafeMetric** (KPIs & Stats)
+   - \`type\`: "Metric"
+   - \`props\`:
+     - \`label\` (string): Small top label (e.g., "Total Cost").
+     - \`value\` (string): The big number (e.g., "$4.20").
+     - \`trend\` (enum): "up", "down", "neutral".
+     - \`trendValue\` (string): Small indicator (e.g., "+12%").
+
+3. **TraceRibbon** (The Nervous System)
+   - \`type\`: "TraceRibbon"
+   - \`props\`:
+     - \`events\`: Array of mock/real events to visualize execution flow. Used for debugging/transparency.
+
+4. **SafeTable** (The Registry)
+   - \`type\`: "Table"
+   - \`props\`:
+     - \`columns\`: Array of \`{ key: string, header: string, sortable?: boolean }\`.
+     - \`data\`: Array of objects matching keys.
+     - \`searchable\`: boolean (optional).
+     - \`pagination\`: \`{ pageSize?: number, showPagination?: boolean }\` (optional).
+
+5. **SafeChart** (Data Visualization)
+   - \`type\`: "Chart"
+   - \`props\`:
+     - \`type\`: "bar" | "line" | "pie" | "area"
+     - \`data\`: Array of \`{ label: string, value: number, color?: string }\`
+     - \`title\`: string (optional)
+
+6. **SafeBadge** (Status Indicators)
+   - \`type\`: "Badge"
+   - \`props\`:
+     - \`variant\`: "default" | "success" | "warning" | "error" | "info" | "neutral"
+     - \`size\`: "sm" | "md" | "lg"
+
+# OUTPUT FORMAT
+
+You must return **ONLY** valid JSON. No markdown blocks, no explanations.
+
+Structure:
+{
+  "view_id": "string (unique_slug_for_caching)",
+  "title": "string (The page header)",
+  "layout_type": "dashboard" | "ribbon",
+  "components": [ ...AtomicComponent objects... ]
+}
+
+Each component can have \`children\` array for nesting. Use \`animation_delay\` (number) to stagger animations.
+
+# INTENT MAPPING EXAMPLES
+
+## Case 1: "Show me the costs for today"
+- **Vibe:** Analytical, Clean.
+- **Components:** A grid of \`SafeMetric\` cards showing generic placeholders.
+- **Animation:** 0, 1, 2 delay.
+
+## Case 2: "Debug why the last run failed"
+- **Vibe:** Alert, Technical, Deep.
+- **Components:**
+  1. A \`SafeCard\` (variant: "error") summarizing the failure.
+  2. A \`TraceRibbon\` showing the sequence of events.
+
+## Case 3: "List all active contracts"
+- **Vibe:** Administrative, Organized.
+- **Components:** A \`SafeCard\` containing a \`SafeTable\`.
+
+# YOUR CURRENT TASK
+
+**User Intent:** "${prompt}"
+${context ? `**Context Data:** ${JSON.stringify(context)}` : ''}
+
+Render the Blueprint now. Return ONLY valid JSON, no markdown, no explanations.`;
+
+    const userPrompt = `Generate the JSON layout blueprint for: "${prompt}"`;
+
+    try {
+      const result = await this.llmRouter.generateText(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        {
+          provider: process.env.LLM_PROVIDER || 'openai',
+          model: process.env.LLM_MODEL || 'gpt-4o-mini',
+          temperature: 0.3, // Lower temperature for more consistent JSON
+          maxTokens: 2000,
+        },
+        undefined, // No tools
+        { agentId: 'visual-cortex', runId: 'render-layout' },
+      );
+
+      // Parse JSON from response
+      const jsonText = result.text.trim();
+      // Remove markdown code blocks if present
+      const cleanJson = jsonText.replace(/^```json\n?/i, '').replace(/^```\n?/i, '').replace(/\n?```$/i, '');
+      
+      const layout = JSON.parse(cleanJson);
+      
+      // Validate basic structure
+      if (!layout.view_id || !layout.title || !layout.components) {
+        throw new Error('Invalid layout structure from LLM');
+      }
+
+      return layout;
+    } catch (error) {
+      console.error('LLM layout generation error:', error);
+      throw error; // Will be caught by caller and fallback to mock
+    }
   }
 
   private async generateRegistryContractsLayout(): Promise<any> {
