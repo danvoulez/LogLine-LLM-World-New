@@ -15,6 +15,7 @@ import { AgentNotFoundException } from '../common/exceptions/agent-not-found.exc
 import { AgentExecutionException } from '../common/exceptions/agent-execution.exception';
 import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
 import { BudgetTrackerService } from '../execution/budget-tracker.service';
+import { MemoryService } from '../memory/memory.service';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -57,6 +58,7 @@ export class AgentRuntimeService {
     private tdlnTService: TdlnTService,
     private agentInputValidator: AgentInputValidatorService,
     private budgetTracker: BudgetTrackerService,
+    private memoryService: MemoryService,
   ) {}
 
   async runAgentStep(
@@ -403,6 +405,25 @@ export class AgentRuntimeService {
       messages.push({
         role: 'user',
         content: combinedContext,
+      });
+    }
+
+    // Add relevant memories to context if available
+    if (relevantMemories.length > 0) {
+      const memoryContext = `Relevant memories from previous interactions:
+
+${relevantMemories
+  .map(
+    (m, idx) =>
+      `${idx + 1}. [${m.type}] ${m.content.substring(0, 200)}${m.content.length > 200 ? '...' : ''} (similarity: ${(m.similarity * 100).toFixed(1)}%)`,
+  )
+  .join('\n')}
+
+These memories may help inform your decisions and responses.`;
+
+      messages.push({
+        role: 'user',
+        content: memoryContext,
       });
     }
 

@@ -13,6 +13,7 @@ import { Step } from '../runs/entities/step.entity';
 import { ToolsModule } from '../tools/tools.module';
 import { LlmModule } from '../llm/llm.module';
 import { TdlnTModule } from '../tdln-t/tdln-t.module';
+import { MemoryModule } from '../memory/memory.module';
 import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
 import { AtomicValidatorService } from './validators/atomic-validator.service';
 import { RunsModule } from '../runs/runs.module';
@@ -23,6 +24,7 @@ import { RunsModule } from '../runs/runs.module';
     ToolsModule,
     LlmModule,
     TdlnTModule,
+    MemoryModule, // Memory & RAG for agent context
     RunsModule, // Import to access BudgetTrackerService
   ],
   controllers: [AgentsController],
