@@ -99,7 +99,22 @@ export class AgentRuntimeService {
         };
       } catch (error) {
         // If deterministic handling fails, fall back to LLM
-        this.logger.warn(`Deterministic task handling failed, falling back to LLM: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        
+        this.logger.warn(
+          `Deterministic task handling failed for agent ${agentId}, falling back to LLM | Error: ${errorName}: ${errorMessage}`,
+          {
+            agent_id: agent.id,
+            run_id: context.runId,
+            step_id: context.stepId,
+            error_details: {
+              name: errorName,
+              message: errorMessage,
+              ...(error instanceof Error && error.stack && { stack: error.stack }),
+            },
+          },
+        );
       }
     }
 
@@ -140,7 +155,7 @@ export class AgentRuntimeService {
           kind: EventKind.POLICY_EVAL,
           payload: {
             action: 'agent_call',
-            agent_id: agentId,
+            agent_id: agent.id,
             app_id: context.appId,
             user_id: context.userId,
             tenant_id: context.tenantId,
@@ -179,7 +194,7 @@ export class AgentRuntimeService {
         kind: EventKind.POLICY_EVAL,
         payload: {
           action: 'agent_call',
-          agent_id: agentId,
+          agent_id: agent.id,
           app_id: context.appId,
           user_id: context.userId,
           tenant_id: context.tenantId,
@@ -200,10 +215,22 @@ export class AgentRuntimeService {
       if (error instanceof ScopeDeniedException) {
         throw error;
       }
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
       this.logger.error(
-        `Policy check failed for agent: ${agentId}`,
+        `Policy check failed for agent: ${agentId} | Error: ${errorName}: ${errorMessage}`,
         error instanceof Error ? error.stack : String(error),
-        logContext,
+        {
+          ...logContext,
+          error_details: {
+            name: errorName,
+            message: errorMessage,
+            ...(error instanceof Error && error.stack && { stack: error.stack }),
+          },
+          note: 'Execution will continue (fail open). In production, consider failing closed.',
+        },
       );
       // Don't block execution if policy check fails (fail open for now)
       // In production, you might want to fail closed
@@ -351,11 +378,36 @@ export class AgentRuntimeService {
           const toolName = toolCallAny.toolName || toolCallAny.tool || 'unknown';
           const args = toolCallAny.args || toolCallAny.parameters || toolCallAny.input || {};
           
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorName = error instanceof Error ? error.name : 'UnknownError';
+          
+          // Log tool call failure with context
+          this.logger.error(
+            `Tool call failed during agent execution: ${toolName} | Agent: ${agentId} | Error: ${errorName}: ${errorMessage}`,
+            error instanceof Error ? error.stack : String(error),
+            {
+              agent_id: agent.id,
+              run_id: context.runId,
+              step_id: context.stepId,
+              tool_name: toolName,
+              tool_args: args,
+              error_details: {
+                name: errorName,
+                message: errorMessage,
+                ...(error instanceof Error && error.stack && { stack: error.stack }),
+              },
+            },
+          );
+          
           toolCalls.push({
             toolId: toolName,
             toolName: toolName,
             args: args,
-            result: { error: error.message },
+            result: {
+              error: errorMessage,
+              error_type: errorName,
+              ...(error instanceof Error && error.stack && { stack: error.stack }),
+            },
           });
         }
       }
@@ -372,7 +424,7 @@ export class AgentRuntimeService {
           type: 'long_term',
           content: `Agent ${agentId} decision: ${result.text.substring(0, 1000)}`,
           metadata: {
-            agent_id: agentId,
+            agent_id: agent.id,
             step_id: context.stepId,
             tool_calls: toolCalls.length || 0,
             finish_reason: result.finishReason,
@@ -383,7 +435,22 @@ export class AgentRuntimeService {
       }
     } catch (error) {
       // Don't fail the agent execution if memory storage fails
-      this.logger.warn(`Failed to store agent memory: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
+      this.logger.warn(
+        `Failed to store agent memory for agent ${agentId} | Error: ${errorName}: ${errorMessage}`,
+        {
+          agent_id: agent.id,
+          run_id: context.runId,
+          step_id: context.stepId,
+          error_details: {
+            name: errorName,
+            message: errorMessage,
+            ...(error instanceof Error && error.stack && { stack: error.stack }),
+          },
+        },
+      );
     }
 
     return {
@@ -482,7 +549,22 @@ export class AgentRuntimeService {
       }
     } catch (error) {
       // Fallback to natural language if atomic conversion fails
-      console.warn('Failed to build atomic context, falling back to natural language:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
+      this.logger.warn(
+        `Failed to build atomic context for agent ${agent.id}, falling back to natural language | Error: ${errorName}: ${errorMessage}`,
+        {
+          agent_id: agent.id,
+          run_id: context.runId,
+          step_id: context.stepId,
+          error_details: {
+            name: errorName,
+            message: errorMessage,
+            ...(error instanceof Error && error.stack && { stack: error.stack }),
+          },
+        },
+      );
     }
 
     // Retrieve relevant memories for context
@@ -554,7 +636,22 @@ export class AgentRuntimeService {
           .slice(0, 10); // Limit to top 10
       }
     } catch (error) {
-      this.logger.warn(`Failed to retrieve memories for agent context: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
+      this.logger.warn(
+        `Failed to retrieve memories for agent context | Agent: ${agent.id} | Error: ${errorName}: ${errorMessage}`,
+        {
+          agent_id: agent.id,
+          run_id: context.runId,
+          step_id: context.stepId,
+          error_details: {
+            name: errorName,
+            message: errorMessage,
+            ...(error instanceof Error && error.stack && { stack: error.stack }),
+          },
+        },
+      );
     }
 
     // Refract input text to JSON✯Atomic format (if it's a string)
@@ -571,7 +668,23 @@ export class AgentRuntimeService {
         };
       } catch (error) {
         // If refraction fails, use original input
-        this.logger.warn('Failed to refract input, using original:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+        
+        this.logger.warn(
+          `Failed to refract input for agent ${agent.id}, using original input | Error: ${errorName}: ${errorMessage}`,
+          {
+            agent_id: agent.id,
+            run_id: context.runId,
+            step_id: context.stepId,
+            input_preview: typeof input === 'string' ? input.substring(0, 100) : '[non-string]',
+            error_details: {
+              name: errorName,
+              message: errorMessage,
+              ...(error instanceof Error && error.stack && { stack: error.stack }),
+            },
+          },
+        );
       }
     }
 

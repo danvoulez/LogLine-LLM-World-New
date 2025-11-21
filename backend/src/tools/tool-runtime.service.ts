@@ -302,6 +302,18 @@ export class ToolRuntimeService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown tool error';
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      // Build enhanced error context
+      const errorContext = {
+        ...logContext,
+        tool_name: tool?.name || toolId,
+        input_summary: this.summarizeInputForError(validatedInput),
+        error_name: errorName,
+        error_message: errorMessage,
+        timestamp: new Date().toISOString(),
+      };
 
       // Log error event with enhanced context
       await this.eventRepository.save({
@@ -310,27 +322,42 @@ export class ToolRuntimeService {
         kind: EventKind.ERROR,
         payload: {
           tool_id: toolId,
+          tool_name: tool?.name || toolId,
           input: validatedInput,
           error: errorMessage,
-          error_type: error instanceof Error ? error.name : 'Unknown',
-          ...(error instanceof Error && error.stack && { stack: error.stack }),
-          context: logContext,
+          error_type: errorName,
+          error_name: errorName,
+          ...(errorStack && { stack: errorStack }),
+          context: errorContext,
+          timestamp: new Date().toISOString(),
         },
       });
 
+      // Verbose error logging
       this.logger.error(
-        `Tool execution failed: ${toolId}`,
-        error instanceof Error ? error.stack : String(error),
-        logContext,
+        `Tool execution failed: ${toolId} (${tool?.name || 'unknown'}) | Error: ${errorName}: ${errorMessage}`,
+        errorStack || String(error),
+        {
+          ...errorContext,
+          error_details: {
+            name: errorName,
+            message: errorMessage,
+            ...(errorStack && { stack: errorStack }),
+          },
+        },
       );
 
       // For non-critical tools, we could return a partial result
-      // For now, throw exception
+      // For now, throw exception with enhanced context
       throw new ToolExecutionException(
         toolId,
         errorMessage,
         error instanceof Error ? error : new Error(String(error)),
-        logContext,
+        {
+          ...errorContext,
+          tool_name: tool?.name || toolId,
+          input: validatedInput,
+        },
       );
     }
 
@@ -367,6 +394,34 @@ export class ToolRuntimeService {
 
   async getAllTools(): Promise<Tool[]> {
     return this.toolRepository.find();
+  }
+
+  /**
+   * Summarize input for error messages (avoid logging sensitive data)
+   */
+  private summarizeInputForError(input: any): string {
+    if (!input) return 'none';
+
+    try {
+      const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
+      
+      // Truncate long inputs
+      if (inputStr.length > 200) {
+        return `${inputStr.substring(0, 200)}... (truncated)`;
+      }
+
+      // Mask sensitive fields
+      const sensitiveFields = ['password', 'token', 'key', 'secret', 'api_key', 'apikey'];
+      let masked = inputStr;
+      for (const field of sensitiveFields) {
+        const regex = new RegExp(`"${field}"\\s*:\\s*"[^"]*"`, 'gi');
+        masked = masked.replace(regex, `"${field}": "***MASKED***"`);
+      }
+
+      return masked;
+    } catch {
+      return '[unable to serialize input]';
+    }
   }
 }
 

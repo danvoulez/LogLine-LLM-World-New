@@ -85,18 +85,52 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ...context,
     };
 
+    // Enhanced error logging with verbose context
+    const verboseContext = {
+      ...logContext,
+      error_details: {
+        code: errorCode,
+        message,
+        ...(exception instanceof Error && {
+          name: exception.name,
+          ...(process.env.NODE_ENV === 'development' && {
+            stack: exception.stack,
+          }),
+        }),
+      },
+      request_details: {
+        method: request.method,
+        url: request.url,
+        path: request.path,
+        query: request.query,
+        body_preview: request.body
+          ? JSON.stringify(request.body).substring(0, 500)
+          : undefined,
+        headers: {
+          'user-agent': request.headers['user-agent'],
+          'content-type': request.headers['content-type'],
+          'authorization': request.headers['authorization']
+            ? '[REDACTED]'
+            : undefined,
+        },
+      },
+    };
+
     if (status >= 500) {
       // Server errors - log with stack trace in development
       this.logger.error(
-        `${errorCode}: ${message}`,
+        `${errorCode}: ${message} | Path: ${request.method} ${request.path} | TraceId: ${traceId || 'none'}`,
         process.env.NODE_ENV === 'development' && exception instanceof Error
           ? exception.stack
           : undefined,
-        logContext,
+        verboseContext,
       );
     } else {
-      // Client errors - log as warning
-      this.logger.warn(`${errorCode}: ${message}`, logContext);
+      // Client errors - log as warning with context
+      this.logger.warn(
+        `${errorCode}: ${message} | Path: ${request.method} ${request.path} | TraceId: ${traceId || 'none'}`,
+        verboseContext,
+      );
     }
 
     // Format error response

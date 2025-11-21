@@ -944,29 +944,48 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown node execution error';
+      const errorName = error instanceof Error ? error.name : 'Unknown';
+      const errorStack = error instanceof Error ? error.stack : undefined;
 
-      // Mark step as failed
+      // Mark step as failed with enhanced error information
       savedStep.status = StepStatus.FAILED;
       savedStep.output = {
         error: errorMessage,
-        error_type: error instanceof Error ? error.name : 'Unknown',
-        ...(error instanceof Error && error.stack && { stack: error.stack }),
+        error_type: errorName,
+        error_name: errorName,
+        ...(errorStack && { stack: errorStack }),
+        timestamp: new Date().toISOString(),
+        node_id: node.id,
+        node_type: node.type,
       };
       savedStep.finished_at = new Date();
       await this.stepRepository.save(savedStep);
 
       const run = await this.runRepository.findOne({ where: { id: runId } });
-      this.logger.error(
-        `Step execution failed: ${node.id} (${node.type})`,
-        error instanceof Error ? error.stack : String(error),
-        {
-          run_id: runId,
-          step_id: savedStep.id,
-          node_id: node.id,
-          node_type: node.type,
-          tenant_id: run?.tenant_id,
-          user_id: run?.user_id,
+      
+      // Build enhanced error context
+      const errorContext = {
+        run_id: runId,
+        step_id: savedStep.id,
+        node_id: node.id,
+        node_type: node.type,
+        workflow_id: run?.workflow_id,
+        app_id: run?.app_id,
+        tenant_id: run?.tenant_id,
+        user_id: run?.user_id,
+        error_details: {
+          name: errorName,
+          message: errorMessage,
+          ...(errorStack && { stack: errorStack }),
         },
+        timestamp: new Date().toISOString(),
+      };
+
+      // Verbose error logging
+      this.logger.error(
+        `Step execution failed: ${node.id} (${node.type}) | Run: ${runId} | Error: ${errorName}: ${errorMessage}`,
+        errorStack || String(error),
+        errorContext,
       );
 
       await this.eventRepository.save({
@@ -977,16 +996,24 @@ Please respond with the number (1, 2, 3, etc.) of the condition that applies, or
           node_id: node.id,
           node_type: node.type,
           error: errorMessage,
-          error_type: error instanceof Error ? error.name : 'Unknown',
-          ...(error instanceof Error && error.stack && { stack: error.stack }),
+          error_type: errorName,
+          error_name: errorName,
+          ...(errorStack && { stack: errorStack }),
+          context: errorContext,
+          timestamp: new Date().toISOString(),
         },
       });
 
       // For router nodes, try to use fallback route
       if (node.type === 'router') {
         this.logger.warn(
-          `Router node failed, attempting fallback route`,
-          { node_id: node.id, run_id: runId },
+          `Router node failed, attempting fallback route | Node: ${node.id} | Run: ${runId}`,
+          {
+            node_id: node.id,
+            run_id: runId,
+            workflow_id: run?.workflow_id,
+            error: errorMessage,
+          },
         );
         // Could implement fallback logic here
       }
