@@ -26,7 +26,11 @@ import { AppsModule } from './apps/apps.module';
 import { FilesModule } from './files/files.module';
 import { TdlnTModule } from './tdln-t/tdln-t.module';
 import { MemoryModule } from './memory/memory.module';
+import { PoliciesModule } from './policies/policies.module';
 import { File } from './files/entities/file.entity';
+import { MemoryItem } from './memory/entities/memory-item.entity';
+import { Resource } from './memory/entities/resource.entity';
+import { Policy } from './policies/entities/policy.entity';
 import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
@@ -38,7 +42,7 @@ function getDatabaseConfig() {
     return {
       type: 'postgres' as const,
       url: process.env.POSTGRES_URL,
-      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File],
+      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File, MemoryItem, Resource, Policy],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
       // Vercel Postgres requires SSL in production
@@ -103,7 +107,8 @@ function getDatabaseConfig() {
           AppsModule,
           FilesModule,
           TdlnTModule, // TDLN-T deterministic translation
-          MemoryModule, // Memory & RAG engine
+          MemoryModule,
+    PoliciesModule, // Memory & RAG engine
         ],
   controllers: [AppController, DatabaseController],
   providers: [
