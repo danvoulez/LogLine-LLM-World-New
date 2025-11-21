@@ -4,10 +4,10 @@
   "installCommand": "cd backend && npm install",
   "framework": null,
   "outputDirectory": "backend/dist",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
+      "src": "/(.*)",
+      "dest": "api/index.js"
     }
   ],
   "crons": [
