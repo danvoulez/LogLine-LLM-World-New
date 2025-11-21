@@ -244,12 +244,20 @@ export class MemoryService {
   }
 
   /**
-   * Delete a memory item
+   * Delete a memory item with ownership validation
    */
-  async deleteMemory(memoryId: string): Promise<void> {
-    const memory = await this.memoryRepository.findOne({ where: { id: memoryId } });
+  async deleteMemory(
+    memoryId: string,
+    owner_type: MemoryOwnerType,
+    owner_id: string,
+  ): Promise<void> {
+    const memory = await this.memoryRepository.findOne({
+      where: { id: memoryId, owner_type, owner_id },
+    });
     if (!memory) {
-      throw new NotFoundException(`Memory item ${memoryId} not found`);
+      throw new NotFoundException(
+        `Memory item ${memoryId} not found for owner ${owner_type}:${owner_id}`,
+      );
     }
 
     await this.memoryRepository.remove(memory);

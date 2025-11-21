@@ -68,8 +68,11 @@ export class MemoryTool {
         if (input.owner_type === 'tenant') {
           // Force tenant_id from context
           finalOwnerId = context.tenantId;
-        } else if (input.owner_type === 'user' && context.userId) {
-          // Force user_id from context if available
+        } else if (input.owner_type === 'user') {
+          // CRITICAL SECURITY: Require userId in context
+          if (!context.userId) {
+            throw new Error('Cannot use owner_type=user without userId in context');
+          }
           finalOwnerId = context.userId;
         } else if (input.owner_type === 'app' && context.appId) {
           // Validate app_id matches context
@@ -157,8 +160,11 @@ export class MemoryTool {
         if (input.owner_type === 'tenant') {
           // Force tenant_id from context
           finalOwnerId = context.tenantId;
-        } else if (input.owner_type === 'user' && context.userId) {
-          // Force user_id from context if available
+        } else if (input.owner_type === 'user') {
+          // CRITICAL SECURITY: Require userId in context
+          if (!context.userId) {
+            throw new Error('Cannot use owner_type=user without userId in context');
+          }
           finalOwnerId = context.userId;
         } else if (input.owner_type === 'app' && context.appId) {
           // Validate app_id matches context
@@ -254,25 +260,48 @@ export class MemoryTool {
         },
       },
       handler: async (input: any, context: ToolContext) => {
-        // Validate and enforce tenant/user/app ownership
-        let finalOwnerType = input.owner_type as MemoryOwnerType | undefined;
-        let finalOwnerId = input.owner_id;
-        
+        // CRITICAL SECURITY: Default safe - prevent cross-tenant global search
+        let finalOwnerType: MemoryOwnerType;
+        let finalOwnerId: string;
+
         if (input.owner_type === 'tenant') {
           // Force tenant_id from context
+          if (!context.tenantId) {
+            throw new Error('Cannot use owner_type=tenant without tenantId in context');
+          }
           finalOwnerType = 'tenant';
           finalOwnerId = context.tenantId;
-        } else if (input.owner_type === 'user' && context.userId) {
-          // Force user_id from context if available
+        } else if (input.owner_type === 'user') {
+          // CRITICAL SECURITY: Require userId in context
+          if (!context.userId) {
+            throw new Error('Cannot use owner_type=user without userId in context');
+          }
           finalOwnerType = 'user';
           finalOwnerId = context.userId;
-        } else if (input.owner_type === 'app' && context.appId) {
+        } else if (input.owner_type === 'app') {
           // Validate app_id matches context
+          if (!context.appId) {
+            throw new Error('Cannot use owner_type=app without appId in context');
+          }
           if (input.owner_id && input.owner_id !== context.appId) {
             throw new Error(`App ID mismatch: cannot search memory for app ${input.owner_id} from context app ${context.appId}`);
           }
           finalOwnerType = 'app';
           finalOwnerId = context.appId;
+        } else if (!input.owner_type) {
+          // DEFAULT SAFE: If no owner_type specified, default to tenant from context
+          if (!context.tenantId) {
+            throw new Error('owner_type required or tenantId must be in context');
+          }
+          finalOwnerType = 'tenant';
+          finalOwnerId = context.tenantId;
+        } else {
+          // For agent/run, require explicit owner_id
+          if (!input.owner_id) {
+            throw new Error(`owner_id required for owner_type=${input.owner_type}`);
+          }
+          finalOwnerType = input.owner_type as MemoryOwnerType;
+          finalOwnerId = input.owner_id;
         }
 
         const results = await this.memoryService.searchMemory({
@@ -313,6 +342,15 @@ export class MemoryTool {
             type: 'string',
             description: 'ID of the memory item to delete',
           },
+          owner_type: {
+            type: 'string',
+            enum: ['user', 'tenant', 'app', 'agent', 'run'],
+            description: 'Optional: Type of owner. If not provided, defaults to tenant from context.',
+          },
+          owner_id: {
+            type: 'string',
+            description: 'Optional: ID of the owner (required for agent/run owner_type)',
+          },
         },
         required: ['memory_id'],
       },
@@ -323,10 +361,45 @@ export class MemoryTool {
         },
       },
       handler: async (input: any, context: ToolContext) => {
-        // Note: Delete operation doesn't have owner_type/owner_id in input
-        // We rely on the memory service to validate ownership if needed
-        // For now, we allow deletion - future enhancement could add ownership validation
-        await this.memoryService.deleteMemory(input.memory_id);
+        // CRITICAL SECURITY: Enforce ownership validation
+        // Determine owner_type and owner_id from context (default to tenant for safety)
+        let ownerType: MemoryOwnerType;
+        let ownerId: string;
+
+        if (input.owner_type) {
+          ownerType = input.owner_type as MemoryOwnerType;
+          if (ownerType === 'tenant') {
+            if (!context.tenantId) {
+              throw new Error('Cannot delete tenant memory without tenantId in context');
+            }
+            ownerId = context.tenantId;
+          } else if (ownerType === 'user') {
+            if (!context.userId) {
+              throw new Error('Cannot delete user memory without userId in context');
+            }
+            ownerId = context.userId;
+          } else if (ownerType === 'app') {
+            if (!context.appId) {
+              throw new Error('Cannot delete app memory without appId in context');
+            }
+            ownerId = context.appId;
+          } else {
+            // For agent/run, require explicit owner_id
+            if (!input.owner_id) {
+              throw new Error(`owner_id required for owner_type=${ownerType}`);
+            }
+            ownerId = input.owner_id;
+          }
+        } else {
+          // Default safe: use tenant from context
+          if (!context.tenantId) {
+            throw new Error('owner_type required or tenantId must be in context');
+          }
+          ownerType = 'tenant';
+          ownerId = context.tenantId;
+        }
+
+        await this.memoryService.deleteMemory(input.memory_id, ownerType, ownerId);
         return { deleted: true };
       },
     };

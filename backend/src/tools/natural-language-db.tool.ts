@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
 import { ToolContext } from './tool-runtime.service';
 import { RunsService } from '../runs/runs.service';
+import { LlmRouterService } from '../llm/llm-router.service';
 
 @Injectable()
 export class NaturalLanguageDbTool {
   constructor(
     private dataSource: DataSource,
     private runsService: RunsService,
+    private llmRouter: LlmRouterService,
   ) {}
 
   /**
@@ -113,10 +113,9 @@ export class NaturalLanguageDbTool {
         // Policy check is handled by ToolRuntimeService before calling this handler
         // No need to check here - if we reach this point, policy has already been evaluated
 
-        // Use AI to convert natural language to SQL
-        const result = await generateText({
-          model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-          prompt: `You're helping convert a natural language question into a PostgreSQL SQL SELECT query.
+        // Use AI to convert natural language to SQL via LlmRouterService (for observability and budget tracking)
+        const result = await this.llmRouter.generateText(
+          `You're helping convert a natural language question into a PostgreSQL SQL SELECT query.
 
 Question: ${input.query}
 
@@ -131,7 +130,18 @@ Here's the database schema you're working with:
 Please generate a SELECT query that answers the question. This is a read-only operation, so only SELECT statements are allowed. If you notice any issues or need clarification about the schema, feel free to mention them.
 
 Generate the SQL query:`,
-        });
+          {
+            provider: 'openai',
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            temperature: 0,
+          },
+          undefined,
+          {
+            agentId: 'natural_language_db_read',
+            runId: context.runId,
+            stepId: context.stepId,
+          },
+        );
 
         let sql = result.text.trim();
 
@@ -217,10 +227,9 @@ Generate the SQL query:`,
 
         const { instruction, dryRun = true, confirm = false, require_human_confirmation = true } = input;
 
-        // Generate SQL from natural language - dignified, clear, helpful
-        const result = await generateText({
-          model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-          prompt: `You're helping convert a natural language instruction into a PostgreSQL SQL statement for a write operation.
+        // Generate SQL from natural language via LlmRouterService (for observability and budget tracking)
+        const result = await this.llmRouter.generateText(
+          `You're helping convert a natural language instruction into a PostgreSQL SQL statement for a write operation.
 
 Instruction: ${instruction}
 
@@ -237,7 +246,18 @@ For this write operation, you can use INSERT or UPDATE statements. Please avoid 
 Generate the SQL query that accomplishes the instruction. If you notice any potential issues or need clarification, feel free to mention them.
 
 SQL query:`,
-        });
+          {
+            provider: 'openai',
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            temperature: 0,
+          },
+          undefined,
+          {
+            agentId: 'natural_language_db_write',
+            runId: context.runId,
+            stepId: context.stepId,
+          },
+        );
 
         const sql = result.text.trim();
 

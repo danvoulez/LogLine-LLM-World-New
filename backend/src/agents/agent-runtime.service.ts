@@ -219,6 +219,8 @@ export class AgentRuntimeService {
         throw error;
       }
       
+      // CRITICAL SECURITY: Fail-closed by default (configurable via env)
+      const failOpen = process.env.POLICY_FAIL_OPEN === 'true';
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       
@@ -232,11 +234,47 @@ export class AgentRuntimeService {
             message: errorMessage,
             ...(error instanceof Error && error.stack && { stack: error.stack }),
           },
-          note: 'Execution will continue (fail open). In production, consider failing closed.',
         },
       );
-      // Don't block execution if policy check fails (fail open for now)
-      // In production, you might want to fail closed
+      
+      if (!failOpen) {
+        // Fail closed: deny execution when policy engine fails
+        this.logger.error(
+          `Policy engine failure → failing closed (POLICY_FAIL_OPEN=false)`,
+          undefined,
+          { ...logContext, policy_error: errorMessage },
+        );
+        
+        await this.eventRepository.save({
+          run_id: context.runId,
+          step_id: context.stepId,
+          kind: EventKind.POLICY_EVAL,
+          payload: {
+            action: 'agent_call',
+            agent_id: agent.id,
+            app_id: context.appId,
+            user_id: context.userId,
+            tenant_id: context.tenantId,
+            result: 'denied',
+            reason: 'policy_engine_failure',
+            policy_error: errorMessage,
+          },
+        });
+        
+        throw new ScopeDeniedException(
+          context.appId || 'system',
+          'agent',
+          agentId,
+          { ...logContext, policy_error: errorMessage },
+        );
+      } else {
+        // Fail open: allow execution when policy engine fails (development only)
+        this.logger.warn(
+          `Policy engine failure → failing open (POLICY_FAIL_OPEN=true)`,
+          undefined,
+          { ...logContext, policy_error: errorMessage },
+        );
+      }
     }
 
     // Load allowed tools

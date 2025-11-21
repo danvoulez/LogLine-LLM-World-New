@@ -219,13 +219,55 @@ export class ToolRuntimeService {
       if (error instanceof ScopeDeniedException) {
         throw error;
       }
+      
+      // CRITICAL SECURITY: Fail-closed by default (configurable via env)
+      const failOpen = process.env.POLICY_FAIL_OPEN === 'true';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
       this.logger.error(
         `Policy check failed for tool: ${toolId}`,
         error instanceof Error ? error.stack : String(error),
         logContext,
       );
-      // Don't block execution if policy check fails (fail open for now)
-      // In production, you might want to fail closed
+      
+      if (!failOpen) {
+        // Fail closed: deny execution when policy engine fails
+        this.logger.error(
+          `Policy engine failure → failing closed (POLICY_FAIL_OPEN=false)`,
+          undefined,
+          { ...logContext, policy_error: errorMessage },
+        );
+        
+        await this.eventRepository.save({
+          run_id: context.runId,
+          step_id: context.stepId,
+          kind: EventKind.POLICY_EVAL,
+          payload: {
+            action: 'tool_call',
+            tool_id: toolId,
+            app_id: context.appId,
+            user_id: context.userId,
+            tenant_id: context.tenantId,
+            result: 'denied',
+            reason: 'policy_engine_failure',
+            policy_error: errorMessage,
+          },
+        });
+        
+        throw new ScopeDeniedException(
+          context.appId || 'system',
+          'tool',
+          toolId,
+          { ...logContext, policy_error: errorMessage },
+        );
+      } else {
+        // Fail open: allow execution when policy engine fails (development only)
+        this.logger.warn(
+          `Policy engine failure → failing open (POLICY_FAIL_OPEN=true)`,
+          undefined,
+          { ...logContext, policy_error: errorMessage },
+        );
+      }
     }
 
     // Check app scope (if app context is provided)
