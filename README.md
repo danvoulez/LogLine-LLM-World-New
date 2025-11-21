@@ -127,16 +127,23 @@ See [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) for detailed 
 - ✅ **Phase 1**: Platform foundation (workflows, runs, steps, events)
 - ✅ **Phase 1.5**: Serverless optimizations (async execution, streaming)
 - ✅ **Phase 2**: Agents, tools & LLM integration (complete)
-- ⏳ **Phase 3**: App platform & developer surface
-- ⏳ **Phase 4**: RAG memory engine, policy engine, polish
+- ✅ **Phase 2.5**: Error handling & testing improvements
+- ✅ **Phase 3**: App platform & developer surface (complete)
+- ✅ **Phase 4**: Memory engine, Policy Engine v1, Auth & RBAC, Audit, Metrics, Alerts, Rate Limiting (complete)
 
 ## Documentation
 
-- [MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md) - Complete system specification
-- [backend/README.md](./backend/README.md) - Backend API documentation and setup
-- [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) - Vercel deployment guide
-- [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md) - Phase 2 implementation details
-- [PHASE4_RAG_MEMORY_INTEGRATION.md](./PHASE4_RAG_MEMORY_INTEGRATION.md) - Phase 4 RAG implementation plan
+### Core Documentation
+- **[MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md)** - Complete system specification (v2.4)
+- **[CODEBASE_REVIEW.md](./CODEBASE_REVIEW.md)** - Codebase review and principles verification
+- **[docs/README.md](./docs/README.md)** - Complete documentation index
+
+### Quick Links
+- **[docs/guides/](./docs/guides/)** - Developer guides (AI SDK, Environment Variables, Deployment)
+- **[docs/phases/](./docs/phases/)** - Phase implementation documentation
+- **[docs/testing/](./docs/testing/)** - Testing documentation
+- **[docs/architecture/](./docs/architecture/)** - Architecture documentation
+- **[docs/design/](./docs/design/)** - Design principles and philosophy
 
 ## License
 
