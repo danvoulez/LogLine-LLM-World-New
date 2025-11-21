@@ -10,6 +10,8 @@ import { LlmModule } from '../llm/llm.module';
 import { RunsModule } from '../runs/runs.module';
 import { AppsModule } from '../apps/apps.module';
 import { PoliciesModule } from '../policies/policies.module';
+import { MemoryModule } from '../memory/memory.module';
+import { MemoryTool } from './memory.tool';
 
 @Module({
   imports: [
@@ -18,9 +20,10 @@ import { PoliciesModule } from '../policies/policies.module';
     RunsModule,
     AppsModule, // Import AppsModule to access AppScopeCheckerService
     PoliciesModule, // Import PoliciesModule to access PolicyEngineV0Service
+    MemoryModule, // Import MemoryModule to access MemoryService
   ],
   controllers: [ToolsController],
-  providers: [ToolRuntimeService, NaturalLanguageDbTool, SchemaValidatorService],
+  providers: [ToolRuntimeService, NaturalLanguageDbTool, MemoryTool, SchemaValidatorService],
   exports: [ToolRuntimeService],
 })
 export class ToolsModule {}

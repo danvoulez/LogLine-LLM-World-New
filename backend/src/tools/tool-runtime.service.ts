@@ -13,6 +13,7 @@ import { AppScopeCheckerService } from '../apps/services/app-scope-checker.servi
 import { PolicyEngineV0Service } from '../policies/policy-engine-v0.service';
 import { RetryUtil } from '../common/utils/retry.util';
 import { sanitizeForLogging } from '../common/utils/sanitize.util';
+import { MemoryTool } from './memory.tool';
 
 export interface ToolContext {
   runId: string;
@@ -35,6 +36,7 @@ export class ToolRuntimeService {
     @InjectRepository(Event)
     private eventRepository: Repository<Event>,
     private naturalLanguageDbTool: NaturalLanguageDbTool,
+    private memoryTool: MemoryTool,
     private schemaValidator: SchemaValidatorService,
     private scopeChecker: AppScopeCheckerService,
     private policyEngine: PolicyEngineV0Service,
@@ -64,6 +66,14 @@ export class ToolRuntimeService {
         ],
       };
     });
+
+    // Register memory tools
+    const memoryTools = this.memoryTool.getAllTools();
+    for (const tool of memoryTools) {
+      this.toolHandlers.set(tool.id, async (input, ctx) => {
+        return tool.handler(input, ctx);
+      });
+    }
   }
 
   async callTool(

@@ -25,6 +25,7 @@ import { AgentsModule } from './agents/agents.module';
 import { AppsModule } from './apps/apps.module';
 import { FilesModule } from './files/files.module';
 import { TdlnTModule } from './tdln-t/tdln-t.module';
+import { MemoryModule } from './memory/memory.module';
 import { File } from './files/entities/file.entity';
 import { DataSource } from 'typeorm';
 
@@ -102,6 +103,7 @@ function getDatabaseConfig() {
           AppsModule,
           FilesModule,
           TdlnTModule, // TDLN-T deterministic translation
+          MemoryModule, // Memory & RAG engine
         ],
   controllers: [AppController, DatabaseController],
   providers: [
