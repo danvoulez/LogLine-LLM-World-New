@@ -6,6 +6,7 @@ import {
   Param,
   NotFoundException,
   Res,
+  Patch,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { RunsService } from './runs.service';
@@ -135,6 +136,29 @@ export class RunsController {
       clearInterval(interval);
       res.end();
     });
+  }
+
+  @Patch('runs/:id/resume')
+  async resumeRun(
+    @Param('id') id: string,
+    @Body() body: { approval_input: Record<string, any> },
+  ): Promise<RunResponseDto> {
+    const run = await this.orchestratorService.resumeRun(id, body.approval_input || {});
+    return {
+      id: run.id,
+      workflow_id: run.workflow_id,
+      workflow_version: run.workflow_version,
+      app_id: run.app_id,
+      app_action_id: run.app_action_id,
+      user_id: run.user_id,
+      tenant_id: run.tenant_id,
+      status: run.status,
+      mode: run.mode,
+      input: run.input,
+      result: run.result,
+      created_at: run.created_at,
+      updated_at: run.updated_at,
+    };
   }
 }
 

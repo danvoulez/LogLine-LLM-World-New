@@ -293,9 +293,15 @@ export class AuthService {
       throw new UnauthorizedException('API key expired');
     }
 
-    // Update last_used_at
-    apiKeyRecord.last_used_at = new Date();
-    await this.apiKeyRepository.save(apiKeyRecord);
+    // Update last_used_at asynchronously (non-blocking)
+    // Only update if last update was more than 1 hour ago to reduce DB writes
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    if (!apiKeyRecord.last_used_at || apiKeyRecord.last_used_at < oneHourAgo) {
+      // Fire and forget - don't block the request
+      this.apiKeyRepository
+        .update(apiKeyRecord.id, { last_used_at: new Date() })
+        .catch((err) => this.logger.warn(`Failed to update API key last_used_at: ${err.message}`));
+    }
 
     return { user: apiKeyRecord.user, apiKey: apiKeyRecord };
   }

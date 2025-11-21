@@ -165,6 +165,192 @@ export class OrchestratorService {
     return savedRun;
   }
 
+  /**
+   * Resume a paused run (e.g., after human approval)
+   * @param runId - The run ID to resume
+   * @param approvalInput - The human approval input (e.g., { approved: true, response: "..." })
+   */
+  async resumeRun(runId: string, approvalInput: Record<string, any>): Promise<Run> {
+    const run = await this.runRepository.findOne({
+      where: { id: runId },
+      relations: ['workflow'],
+    });
+
+    if (!run) {
+      throw new NotFoundException(`Run with ID ${runId} not found`);
+    }
+
+    if (run.status !== RunStatus.PAUSED) {
+      throw new BadRequestException(
+        `Run ${runId} is not paused. Current status: ${run.status}`,
+      );
+    }
+
+    // Find the last pending step (waiting for approval)
+    const pendingStep = await this.stepRepository.findOne({
+      where: { run_id: runId, status: StepStatus.PENDING },
+      order: { started_at: 'DESC' },
+    });
+
+    if (!pendingStep) {
+      throw new BadRequestException(
+        `No pending step found for run ${runId}. Cannot resume.`,
+      );
+    }
+
+    // Update step with approval input
+    pendingStep.status = StepStatus.COMPLETED;
+    pendingStep.output = {
+      ...pendingStep.output,
+      approved: true,
+      approval_input: approvalInput,
+      approved_at: new Date().toISOString(),
+    };
+    pendingStep.finished_at = new Date();
+    await this.stepRepository.save(pendingStep);
+
+    // Log approval event
+    await this.eventRepository.save({
+      run_id: runId,
+      step_id: pendingStep.id,
+      kind: EventKind.STEP_COMPLETED,
+      payload: {
+        node_id: pendingStep.node_id,
+        approval_input: approvalInput,
+        message: 'Human approval received',
+      },
+    });
+
+    // Resume workflow execution
+    const workflow = await this.workflowRepository.findOne({
+      where: { id: run.workflow_id },
+    });
+
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${run.workflow_id} not found`);
+    }
+
+    // Update run status back to running
+    run.status = RunStatus.RUNNING;
+    run.result = null; // Clear pause result
+    await this.runRepository.save(run);
+
+    await this.eventRepository.save({
+      run_id: runId,
+      kind: EventKind.RUN_STARTED,
+      payload: { message: 'Workflow execution resumed after approval' },
+    });
+
+    // Continue execution from where it left off
+    // We need to resume from the node that was paused, so we'll continue the linear workflow
+    // The executeLinearWorkflow will find the next node after the completed step
+    this.resumeLinearWorkflow(runId, workflow, pendingStep.node_id).catch((error) => {
+      this.logger.error(
+        `Error resuming workflow ${run.workflow_id}`,
+        error instanceof Error ? error.stack : String(error),
+        {
+          workflow_id: run.workflow_id,
+          run_id: runId,
+          tenant_id: run.tenant_id,
+          user_id: run.user_id,
+        },
+      );
+    });
+
+    return run;
+  }
+
+  /**
+   * Resume linear workflow execution from a specific node
+   * This is called after a run is resumed from a paused state
+   */
+  private async resumeLinearWorkflow(
+    runId: string,
+    workflow: Workflow,
+    fromNodeId: string,
+  ): Promise<void> {
+    const { definition } = workflow;
+    const { nodes, edges = [] } = definition;
+
+    // Find the node we're resuming from
+    const fromNode = nodes.find((n) => n.id === fromNodeId);
+    if (!fromNode) {
+      throw new Error(`Node ${fromNodeId} not found in workflow`);
+    }
+
+    // Get the next node after the paused one
+    let currentNode: string | null = await this.getNextNode(
+      runId,
+      fromNode,
+      {}, // Step output is already saved in the step
+      edges,
+      nodes,
+    );
+
+    if (!currentNode) {
+      // No next node, workflow is complete
+      const run = await this.runRepository.findOne({ where: { id: runId } });
+      if (run && run.status === RunStatus.RUNNING) {
+        run.status = RunStatus.COMPLETED;
+        const metrics = this.budgetTracker.getMetrics(runId);
+        run.result = {
+          message: 'Workflow completed successfully',
+          ...(metrics && {
+            cost_cents: metrics.costCents,
+            llm_calls: metrics.llmCalls,
+            duration_ms: Date.now() - metrics.startTime,
+          }),
+        };
+        await this.runRepository.save(run);
+
+        await this.eventRepository.save({
+          run_id: runId,
+          kind: EventKind.RUN_COMPLETED,
+          payload: { result: run.result },
+        });
+
+        this.budgetTracker.cleanup(runId);
+      }
+      return;
+    }
+
+    // Continue execution from the next node
+    const MAX_STEPS = 50;
+    let stepCount = 0;
+
+    while (currentNode) {
+      stepCount++;
+      if (stepCount > MAX_STEPS) {
+        throw new Error(
+          `Maximum step limit (${MAX_STEPS}) exceeded. This may indicate an infinite loop or a workflow that needs optimization.`,
+        );
+      }
+
+      const node = nodes.find((n) => n.id === currentNode);
+      if (!node) {
+        throw new Error(`Node ${currentNode} not found`);
+      }
+
+      // Execute node and get output
+      const stepOutput = await this.executeNode(runId, node);
+
+      // Get the step we just executed to pass its output for routing
+      const executedStep = await this.stepRepository.findOne({
+        where: { run_id: runId, node_id: node.id },
+        order: { started_at: 'DESC' },
+      });
+
+      // Determine next node based on node type and edges
+      currentNode = await this.getNextNode(
+        runId,
+        node,
+        executedStep?.output || stepOutput,
+        edges,
+        nodes,
+      );
+    }
+  }
+
   private async executeWorkflow(runId: string, workflow: Workflow): Promise<void> {
     const run = await this.runRepository.findOne({ where: { id: runId } });
     if (!run) return;
@@ -194,6 +380,13 @@ export class OrchestratorService {
         throw new Error(`Workflow type ${workflow.type} not yet supported`);
       }
 
+      // Check if run was cancelled before marking as completed
+      const currentRun = await this.runRepository.findOne({ where: { id: runId } });
+      if (currentRun?.status === RunStatus.CANCELLED) {
+        this.logger.log(`Run ${runId} was cancelled, not marking as completed`);
+        return; // Exit without marking as completed
+      }
+
       // Mark run as completed
       run.status = RunStatus.COMPLETED;
       const metrics = this.budgetTracker.getMetrics(runId);
@@ -218,6 +411,13 @@ export class OrchestratorService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown workflow error';
+
+      // Check if run was cancelled before marking as failed
+      const currentRun = await this.runRepository.findOne({ where: { id: runId } });
+      if (currentRun?.status === RunStatus.CANCELLED) {
+        this.logger.log(`Run ${runId} was cancelled, not marking as failed`);
+        return; // Exit without marking as failed
+      }
 
       // Mark run as failed
       run.status = RunStatus.FAILED;

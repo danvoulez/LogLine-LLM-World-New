@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { File } from './entities/file.entity';
 import { CreateFileDto } from './dto/create-file.dto';
 import { normalizeAndValidatePath } from '../common/utils/path-validator.util';
 
+// Maximum file size: 10MB (for serverless memory constraints)
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const WARN_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB (warn above this)
+
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     @InjectRepository(File)
     private fileRepository: Repository<File>,
@@ -17,10 +23,30 @@ export class FilesService {
     // Normalize path for consistency
     const normalizedPath = normalizeAndValidatePath(createFileDto.path);
     
+    // Calculate actual file size
+    const fileSize = Buffer.byteLength(createFileDto.content, 'utf8');
+    
+    // Validate file size
+    if (fileSize > MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestException(
+        `File size (${(fileSize / (1024 * 1024)).toFixed(2)}MB) exceeds maximum allowed size of ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB. ` +
+        `For large files, consider using Vercel Blob Storage or AWS S3 and storing only the URL in the database.`,
+      );
+    }
+
+    // Warn for large files (may cause performance issues in serverless)
+    if (fileSize > WARN_FILE_SIZE_BYTES) {
+      this.logger.warn(
+        `Large file upload detected: ${(fileSize / (1024 * 1024)).toFixed(2)}MB. ` +
+        `Consider using external storage (Vercel Blob/S3) for better performance.`,
+        { path: normalizedPath, size: fileSize },
+      );
+    }
+    
     const file = this.fileRepository.create({
       ...createFileDto,
       path: normalizedPath,
-      size: Buffer.byteLength(createFileDto.content, 'utf8'),
+      size: fileSize,
     });
     return this.fileRepository.save(file);
   }

@@ -22,6 +22,7 @@ export interface SearchMemoryInput {
   owner_type?: MemoryOwnerType;
   owner_id?: string;
   type?: MemoryType;
+  metadata?: Record<string, any>; // JSONB filter for metadata
   limit?: number;
   threshold?: number; // similarity threshold (0-1)
   embeddingConfig?: EmbeddingConfig;
@@ -176,6 +177,7 @@ export class MemoryService {
       owner_type,
       owner_id,
       type,
+      metadata,
       limit = 10,
       threshold = 0.7,
       embeddingConfig = this.DEFAULT_EMBEDDING_CONFIG,
@@ -201,6 +203,12 @@ export class MemoryService {
     if (type) {
       whereConditions.push(`type = $${params.length + 1}`);
       params.push(type);
+    }
+
+    // Add metadata JSONB filter if provided
+    if (metadata && Object.keys(metadata).length > 0) {
+      whereConditions.push(`metadata @> $${params.length + 1}::jsonb`);
+      params.push(JSON.stringify(metadata));
     }
 
     // Use pgvector cosine similarity
