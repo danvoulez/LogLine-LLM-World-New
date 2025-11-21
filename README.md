@@ -133,6 +133,11 @@ DB_USERNAME=user
 DB_PASSWORD=password
 DB_DATABASE=logline
 
+# GitHub App (Optional - for github_api tool)
+GITHUB_APP_ID=123456
+GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
+GITHUB_INSTALLATION_ID=12345678
+
 # LLM Providers (at least one required)
 OPENAI_API_KEY=sk-...
 # ANTHROPIC_API_KEY=sk-ant-...
