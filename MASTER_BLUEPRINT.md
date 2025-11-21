@@ -1682,76 +1682,90 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 
 **See:** [PHASE4_COMPLETE.md](./PHASE4_COMPLETE.md)
 
-### Phase 5 – Registry Centralizado (📋 PLANNED)
+### Phase 5 – Registry Universal (📋 PLANNED)
 
-**Goal:** Criar um registry centralizado para descoberta e compartilhamento de apps, tools, agents e workflows.
+**Goal:** Criar um **Registry Universal** multitenant e cross-app para gerenciar Pessoas, Contratos, Ideias, Objetos e Apps.
+
+**Conceito:**
+O Registry Universal é o coração do LogLineOS - um repositório centralizado que gerencia:
+1. **Apps** - Aplicações (marketplace público)
+2. **Pessoas** - Identidades universais (LogLine ID)
+3. **Contratos** - Acordos executáveis (máquina de estados)
+4. **Ideias** - Democracia orçamentária (votação colaborativa)
+5. **Objetos** - Matéria inanimada rastreável (documentos, mercadorias, estoque, etc.)
+
+**Princípios:**
+- ✅ **Multitenant** - Isolamento por tenant quando necessário
+- ✅ **Cross-App** - Compartilhamento entre apps quando apropriado
+- ✅ **Apps Participam** - Apps podem criar/ler/atualizar entidades
+- ✅ **Registry Único** - Uma API unificada para todos os tipos
 
 **Problema Identificado:**
 - ✅ Apps têm `visibility` (`private`, `org`, `public`)
-- ❌ **Falta Registry centralizado** para descoberta e compartilhamento
-- ❌ Não há como descobrir apps públicos
-- ❌ Não há como instalar apps de terceiros
-- ❌ Não há versionamento público de apps
+- ❌ **Falta Registry Universal** para Pessoas, Contratos, Ideias, Objetos
+- ❌ Não há identidade universal (LogLine ID)
+- ❌ Não há sistema de votação para ideias
+- ❌ Não há máquina de estados para contratos
+- ❌ Não há rastreabilidade de objetos
 
-**Proposta:**
+**Proposta Expandida:**
 
-1. **Registry de Apps:**
-   - Namespace público: `@owner/app-id` (ex: `@logline/ticket-triage`)
-   - Versionamento semântico: `1.0.0`, `1.1.0`, `2.0.0`
-   - Discovery: `GET /registry/apps?q=...&tags=...&owner=...`
-   - Publicar: `POST /registry/apps` (com manifest)
-   - Instalar: `POST /registry/apps/:namespace/install`
-   - Atualizar: `PATCH /registry/apps/:namespace/update`
-   - Reviews/Ratings: `POST /registry/apps/:namespace/reviews`
+#### 5.1. Pessoas - Identidade Universal
+- **LogLine ID**: `LL-BR-2024-000123456` (único, permanente)
+- **Dois níveis**: Cross-App (universal) + Tenant (isolado)
+- **KYC uma vez**: Válido em todo ecossistema
+- **APIs**: `POST /registry/people/register`, `GET /registry/people/{logline_id}`, `GET /registry/people/search`
 
-2. **Schema:**
-   ```sql
-   CREATE TABLE registry_apps (
-     id              UUID PRIMARY KEY,
-     namespace       TEXT NOT NULL, -- '@owner/app-id'
-     version         TEXT NOT NULL, -- '1.0.0'
-     app_id          VARCHAR(255) NOT NULL,
-     manifest        JSONB NOT NULL,
-     owner_id       UUID NOT NULL,
-     visibility      TEXT NOT NULL DEFAULT 'public',
-     downloads       INTEGER NOT NULL DEFAULT 0,
-     rating          DECIMAL(3,2),
-     rating_count    INTEGER NOT NULL DEFAULT 0,
-     tags            TEXT[],
-     dependencies    JSONB,
-     UNIQUE(namespace, version)
-   );
-   
-   CREATE TABLE registry_reviews (...);
-   CREATE TABLE registry_installations (...);
-   ```
+#### 5.2. Objetos - Matéria Rastreável
+- **Tipos**: Documentos, Arquivos, Mercadorias, Acervo, Lost & Found, Estoque
+- **Rastreabilidade**: De onde veio → onde está → para onde foi
+- **APIs**: `POST /registry/objects`, `PUT /registry/objects/{id}/transfer`, `POST /registry/objects/{id}/movements`
 
-3. **Endpoints:**
-   - `GET /registry/apps` - Discovery (busca, filtros, ordenação)
-   - `GET /registry/apps/:namespace` - Obter app específico
-   - `POST /registry/apps` - Publicar app
-   - `POST /registry/apps/:namespace/install` - Instalar app
-   - `PATCH /registry/apps/:namespace/update` - Atualizar app instalado
-   - `DELETE /registry/apps/:namespace/uninstall` - Desinstalar
-   - `POST /registry/apps/:namespace/reviews` - Criar review
-   - `GET /registry/apps/:namespace/reviews` - Listar reviews
+#### 5.3. Ideias - Democracia Orçamentária
+- **Votação colaborativa**: Prioridade consensual (média ponderada)
+- **Matriz Custo x Prioridade**: Quick Wins vs Investimentos Estratégicos
+- **Fluxo**: Submissão → Votação → Análise → Decisão → Execução → Retrospectiva
+- **APIs**: `POST /registry/ideas`, `POST /registry/ideas/{id}/vote`, `GET /registry/ideas/{id}/matrix`
 
-4. **Futuro:**
-   - Registry de Tools (`GET /registry/tools`)
-   - Registry de Agents (`GET /registry/agents`)
-   - Registry de Workflows (`GET /registry/workflows`)
-   - Marketplace UI
+#### 5.4. Contratos - Acordos Executáveis
+- **Máquina de estados**: RASCUNHO → VIGENTE → QUESTIONADO / CONCLUÍDO / CANCELADO → PENALIZADO
+- **Questionamento automático**: Prazo expirado → Período de defesa → Resolução
+- **Despacho**: Público, Hierárquico, ou Automatizado (substituto de testemunha)
+- **APIs**: `POST /registry/contracts`, `POST /registry/contracts/{id}/sign`, `POST /registry/contracts/{id}/question`
+
+#### 5.5. Apps - Marketplace
+- **Namespace público**: `@owner/app-id` (ex: `@logline/ticket-triage`)
+- **Versionamento semântico**: `1.0.0`, `1.1.0`, `2.0.0`
+- **Discovery**: `GET /registry/apps?q=...&tags=...&owner=...`
+- **Instalação**: `POST /registry/apps/:namespace/install`
+
+#### 5.6. Relacionamentos
+- **Schema genérico**: `registry_relationships` para relacionar qualquer entidade
+- **Tipos**: `owns`, `created`, `references`, `depends_on`, `transforms_to`
+- **Exemplos**: Pessoa → Objeto (owns), Ideia → Contrato (transforms_to)
+
+**Schemas Principais:**
+- `core_people` - Identidade universal (LogLine ID)
+- `tenant_people_relationships` - Relacionamento tenant-pessoa
+- `registry_objects` - Objetos rastreáveis
+- `registry_ideas` - Ideias com votação
+- `registry_contracts` - Contratos executáveis
+- `registry_apps` - Apps do marketplace
+- `registry_relationships` - Relacionamentos genéricos
 
 **Done when:**
-- Apps podem ser publicados no registry público
-- Apps podem ser descobertos via busca/filtros
-- Apps podem ser instalados em qualquer tenant
-- Versionamento e dependências funcionam
-- Reviews/ratings estão disponíveis
+- Pessoas têm LogLine ID universal e podem ser vinculadas entre tenants
+- Objetos são rastreáveis com histórico completo de movimentação
+- Ideias têm sistema de votação e priorização consensual
+- Contratos têm máquina de estados com questionamento e despacho
+- Apps podem ser publicados e instalados do marketplace
+- Relacionamentos entre entidades são rastreáveis
 
-**Status:** 📋 **PLANNED** - Proposta completa em [REGISTRY_PROPOSAL.md](./docs/design/REGISTRY_PROPOSAL.md)
+**Status:** 📋 **PLANNED** - Proposta expandida completa em [REGISTRY_UNIVERSAL_PROPOSAL.md](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md)
 
-**See:** [REGISTRY_PROPOSAL.md](./docs/design/REGISTRY_PROPOSAL.md)
+**See:** 
+- [REGISTRY_UNIVERSAL_PROPOSAL.md](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md) - Proposta expandida completa
+- [REGISTRY.md](../REGISTRY.md) - Documento original com casos de uso detalhados
 
 ---
 
@@ -1827,7 +1841,9 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 
 ### Registry & Marketplace
 
-- [Registry Proposal](./docs/design/REGISTRY_PROPOSAL.md) - Centralized registry for apps, tools, agents, and workflows
+- [Registry Universal Proposal](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md) - **Registry Universal expandido** (Pessoas, Contratos, Ideias, Objetos, Apps)
+- [Registry Proposal](./docs/design/REGISTRY_PROPOSAL.md) - Registry inicial para apps (legado)
+- [Registry.md](../REGISTRY.md) - Documento original com casos de uso detalhados (Padaria Digital, etc.)
 
 ### External Resources
 
