@@ -6,7 +6,16 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://log-line-llm
  * Fetches UI layout from backend based on natural language intent
  * Uses TDLN-T + LLM to generate JSON✯Atomic layout structure
  */
+// Flag to track if we're using mock data (for UI indication)
+let isUsingMockData = false;
+
+export function isCurrentlyUsingMockData(): boolean {
+  return isUsingMockData;
+}
+
 export async function fetchLayoutForIntent(intent: string): Promise<UILayout> {
+  isUsingMockData = false; // Reset flag
+  
   try {
     // Try to call backend render endpoint (if it exists)
     const response = await fetch(`${BACKEND_URL}/api/v1/render`, {
@@ -23,21 +32,25 @@ export async function fetchLayoutForIntent(intent: string): Promise<UILayout> {
     if (response.ok) {
       const data = await response.json();
       if (data.layout) {
+        isUsingMockData = false;
         return data.layout as UILayout;
       }
       // If response doesn't have layout, fallback
       console.warn('Backend response missing layout field, using mock data');
+      isUsingMockData = true;
       return getMockLayout(intent);
     }
 
     // If response is not ok, log and fallback
     const errorText = await response.text();
     console.warn(`Backend render endpoint returned ${response.status}: ${errorText.substring(0, 100)}`);
+    isUsingMockData = true;
     return getMockLayout(intent);
   } catch (error) {
     // Network error or CORS issue
     console.error('Error fetching layout from backend:', error);
     console.warn('Falling back to mock data. Backend may be unreachable or CORS blocked.');
+    isUsingMockData = true;
     // Fallback to mock data on error
     return getMockLayout(intent);
   }

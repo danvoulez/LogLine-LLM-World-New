@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { AtomicRenderer } from "@/components/engine/AtomicRenderer";
-import { fetchLayoutForIntent } from "@/lib/api/client";
+import { fetchLayoutForIntent, isCurrentlyUsingMockData } from "@/lib/api/client";
 import { UILayout } from "@/types/atomic";
 import { OmniBar } from "@/components/safe/OmniBar";
 import { RegisterSW } from "@/app/register-sw";
@@ -11,6 +11,7 @@ export default function AgentOS() {
   const [layout, setLayout] = useState<UILayout | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(false);
 
   const handleExecute = async (prompt: string) => {
     if (!prompt.trim()) return;
@@ -22,6 +23,8 @@ export default function AgentOS() {
       // fetchLayoutForIntent already handles errors internally and falls back to mock
       const result = await fetchLayoutForIntent(prompt);
       setLayout(result);
+      // Check if we're using mock data
+      setUsingMockData(isCurrentlyUsingMockData());
       // Clear any previous errors if we got a result (even if it's mock data)
       setError(null);
     } catch (err) {
@@ -85,7 +88,14 @@ export default function AgentOS() {
           <div className="space-y-8 animate-in fade-in duration-700">
             <header className="flex items-baseline justify-between pb-6 border-b border-gray-200">
               <h1 className="text-3xl font-bold tracking-tight text-gray-900">{layout.title}</h1>
-              <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">Generated via TDLN</span>
+              <div className="flex items-center gap-2">
+                {usingMockData && (
+                  <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                    Using Mock Data
+                  </span>
+                )}
+                <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">Generated via TDLN</span>
+              </div>
             </header>
             
             {layout.components.map((comp) => (
