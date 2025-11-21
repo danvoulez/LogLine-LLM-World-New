@@ -13,13 +13,13 @@ RUN apt-get update \
 # Create app directory
 WORKDIR /usr/src/app
 
-# Install app dependencies
-COPY package*.json ./
+# Install app dependencies (from executor directory)
+COPY executor/package*.json ./
 RUN npm install
 RUN npm install typescript -g
 
-# Bundle app source
-COPY . .
+# Bundle app source (from executor directory)
+COPY executor/ .
 
 # Build
 RUN npm run build
