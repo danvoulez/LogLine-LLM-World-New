@@ -104,116 +104,97 @@ export class AppController {
   }
 
   private async generateLayoutWithLLM(prompt: string, context?: any): Promise<any> {
-    const systemPrompt = `# ROLE & OBJECTIVE
+    // Step 1: Parse intent and fetch real data from Registry
+    const atomicIntent = await this.parseIntentToAtomic(prompt);
+    
+    // Step 2: Fetch data preview from Registry based on intent
+    const dataPreview = await this.fetchDataPreview(atomicIntent);
+    
+    // Step 3: Build JSON✯Atomic input for LLM
+    const atomicInput = {
+      atomic_type: 'intent_vector',
+      vector: atomicIntent.vector,
+      context: {
+        role: context?.role || 'user',
+        vibe: this.determineVibe(prompt, atomicIntent),
+      },
+      data_preview: dataPreview,
+    };
 
-You are the **LogLine Visual Cortex**. You are NOT a chatbot. You do not speak to the user.
+    const systemPrompt = `You are the **LogLine Visual Cortex**, a deterministic rendering engine. You do not speak natural language. You perform a transmutation: **Atomic Intent (Input) → UI Blueprint (Output)**.
 
-Your sole purpose is to translate **User Intent** (Natural Language) into a **Structural Blueprint** (JSON) that the LogLine OS Frontend will render.
-
-# THE PHILOSOPHY: "BEAUTIFUL NOTHING"
-
-1. **Silence is Default:** Do not render clutter. Only render what answers the specific intent.
-
-2. **Cinematic Reveal:** Use \`animation_delay\` to stagger components. They should flow onto the screen like a waterfall, not crash all at once.
-
-3. **Structure First:** You build the Mountain (Layout/Containers). The data (River) will flow into it later.
-
-# THE COMPONENT LIBRARY (Your Bricks)
-
-You may ONLY use these components. Do not hallucinate new ones.
-
-1. **SafeCard** (Container)
-   - \`type\`: "Card"
-   - \`props\`:
-     - \`title\` (string, optional): The header.
-     - \`variant\` (enum): "default" (clean), "glass" (highlight/transparent), "error" (red alert), "success" (green).
-     - \`className\` (string): Tailwind classes. Use \`grid grid-cols-X gap-4\` for layouts.
-
-2. **SafeMetric** (KPIs & Stats)
-   - \`type\`: "Metric"
-   - \`props\`:
-     - \`label\` (string): Small top label (e.g., "Total Cost").
-     - \`value\` (string): The big number (e.g., "$4.20").
-     - \`trend\` (enum): "up", "down", "neutral".
-     - \`trendValue\` (string): Small indicator (e.g., "+12%").
-
-3. **TraceRibbon** (The Nervous System)
-   - \`type\`: "TraceRibbon"
-   - \`props\`:
-     - \`events\`: Array of mock/real events to visualize execution flow. Used for debugging/transparency.
-
-4. **SafeTable** (The Registry)
-   - \`type\`: "Table"
-   - \`props\`:
-     - \`columns\`: Array of \`{ key: string, header: string, sortable?: boolean }\`.
-     - \`data\`: Array of objects matching keys.
-     - \`searchable\`: boolean (optional).
-     - \`pagination\`: \`{ pageSize?: number, showPagination?: boolean }\` (optional).
-
-5. **SafeChart** (Data Visualization)
-   - \`type\`: "Chart"
-   - \`props\`:
-     - \`type\`: "bar" | "line" | "pie" | "area"
-     - \`data\`: Array of \`{ label: string, value: number, color?: string }\`
-     - \`title\`: string (optional)
-
-6. **SafeBadge** (Status Indicators)
-   - \`type\`: "Badge"
-   - \`props\`:
-     - \`variant\`: "default" | "success" | "warning" | "error" | "info" | "neutral"
-     - \`size\`: "sm" | "md" | "lg"
-
-# OUTPUT FORMAT
-
-You must return **ONLY** valid JSON. No markdown blocks, no explanations.
-
-Structure:
+### 1. INPUT PROTOCOL (JSON✯Atomic)
+You will receive a JSON object representing the user's intent and the current data state:
 {
-  "view_id": "string (unique_slug_for_caching)",
-  "title": "string (The page header)",
-  "layout_type": "dashboard" | "ribbon",
-  "components": [ ...AtomicComponent objects... ]
+  "atomic_type": "intent_vector",
+  "vector": {
+    "action": "list" | "debug" | "analyze" | "create",
+    "entity": "contract" | "agent" | "run" | "system" | "person" | "object" | "idea",
+    "filters": { ... }
+  },
+  "context": {
+    "role": "admin" | "user",
+    "vibe": "business" | "zen" | "cyber" (dictates animation style)
+  },
+  "data_preview": {
+    "count": number,
+    "sample": [ ...actual data... ],
+    "meta": { "trend": "up", "cost": 1234 }
+  }
 }
 
-Each component can have \`children\` array for nesting. Use \`animation_delay\` (number) to stagger animations.
+### 2. OUTPUT PROTOCOL (The Blueprint)
+You must return valid JSON matching this schema. NO Markdown. NO explanations.
+{
+  "view_id": "string (slug)",
+  "title": "string (Header)",
+  "layout_type": "dashboard" | "ribbon",
+  "components": [ { "id": "string", "type": "ComponentType", "props": object, "children": [] } ]
+}
 
-# INTENT MAPPING EXAMPLES
+### 3. COMPONENT REGISTRY (Safe DSL)
+Use ONLY these components. Hallucinations will cause runtime crashes.
 
-## Case 1: "Show me the costs for today"
-- **Vibe:** Analytical, Clean.
-- **Components:** A grid of \`SafeMetric\` cards showing generic placeholders.
-- **Animation:** 0, 1, 2 delay.
+- **Card** (Container)
+  - props: { title?: string, variant: "default" | "glass" | "error" | "success", className?: string }
+  - usage: Primary container for everything.
 
-## Case 2: "Debug why the last run failed"
-- **Vibe:** Alert, Technical, Deep.
-- **Components:**
-  1. A \`SafeCard\` (variant: "error") summarizing the failure.
-  2. A \`TraceRibbon\` showing the sequence of events.
+- **Metric** (KPIs)
+  - props: { label: string, value: string, trend?: "up"|"down"|"neutral", trendValue?: string }
+  - usage: Use for single data points or summaries.
 
-## Case 3: "List all active contracts"
-- **Vibe:** Administrative, Organized.
-- **Components:** A \`SafeCard\` containing a \`SafeTable\`.
+- **Table** (Lists/Registry)
+  - props: { columns: [{key, header, sortable?: boolean}], data: object[], searchable?: boolean, pagination?: {pageSize?: number, showPagination?: boolean} }
+  - usage: MANDATORY if input.data_preview.count > 1.
 
-# YOUR CURRENT TASK
+- **TraceRibbon** (Debug/Flow)
+  - props: { events: object[] }
+  - usage: MANDATORY if vector.action == "debug" or "trace".
 
-**User Intent:** "${prompt}"
-${context ? `**Context Data:** ${JSON.stringify(context)}` : ''}
+- **Chart** (Data Visualization)
+  - props: { type: "bar" | "line" | "pie" | "area", data: [{label, value, color?}], title?: string }
 
-Render the Blueprint now. Return ONLY valid JSON, no markdown, no explanations.`;
+- **Badge** (Status Indicators)
+  - props: { variant: "default" | "success" | "warning" | "error" | "info" | "neutral", size?: "sm" | "md" | "lg" }
 
-    const userPrompt = `Generate the JSON layout blueprint for: "${prompt}"`;
+### 4. RENDERING HEURISTICS (The Brain)
+1. **The Volume Rule:** If \`data_preview.count\` is 0, render a "Zen Mode" empty state. If > 1, render a \`Table\`. If huge, render high-level \`Metric\` summaries first.
+2. **The Vibe Rule:** If \`context.vibe\` is "cyber", use \`variant: "glass"\` on cards. If "business", use \`variant: "default"\`.
+3. **The Data Integrity Rule:** Do not invent data. Map fields from \`data_preview.sample\` directly to \`Table\` columns.
+
+### 5. START TRANSMUTATION`;
 
     try {
       const result = await this.llmRouter.generateText(
         [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          { role: 'user', content: JSON.stringify(atomicInput, null, 2) },
         ],
         {
           provider: process.env.LLM_PROVIDER || 'openai',
           model: process.env.LLM_MODEL || 'gpt-4o-mini',
-          temperature: 0.3, // Lower temperature for more consistent JSON
-          maxTokens: 2000,
+          temperature: 0.2, // Very low for deterministic JSON
+          maxTokens: 2500,
         },
         undefined, // No tools
         { agentId: 'visual-cortex', runId: 'render-layout' },
@@ -236,6 +217,193 @@ Render the Blueprint now. Return ONLY valid JSON, no markdown, no explanations.`
       console.error('LLM layout generation error:', error);
       throw error; // Will be caught by caller and fallback to mock
     }
+  }
+
+  /**
+   * Parse natural language prompt into JSON✯Atomic intent vector
+   */
+  private async parseIntentToAtomic(prompt: string): Promise<{
+    vector: {
+      action: 'list' | 'debug' | 'analyze' | 'create' | 'show' | 'view';
+      entity: 'contract' | 'agent' | 'run' | 'system' | 'person' | 'object' | 'idea' | 'general';
+      filters: Record<string, any>;
+    };
+  }> {
+    const lower = prompt.toLowerCase();
+    
+    // Determine action
+    let action: 'list' | 'debug' | 'analyze' | 'create' | 'show' | 'view' = 'show';
+    if (lower.includes('debug') || lower.includes('trace') || lower.includes('error')) {
+      action = 'debug';
+    } else if (lower.includes('analyze') || lower.includes('analysis') || lower.includes('cost')) {
+      action = 'analyze';
+    } else if (lower.includes('list') || lower.includes('show all') || lower.includes('all')) {
+      action = 'list';
+    } else if (lower.includes('create') || lower.includes('new')) {
+      action = 'create';
+    } else if (lower.includes('show') || lower.includes('view') || lower.includes('display')) {
+      action = 'show';
+    }
+
+    // Determine entity
+    let entity: 'contract' | 'agent' | 'run' | 'system' | 'person' | 'object' | 'idea' | 'general' = 'general';
+    if (lower.includes('contract') || lower.includes('contrato')) {
+      entity = 'contract';
+    } else if (lower.includes('agent') || lower.includes('agente')) {
+      entity = 'agent';
+    } else if (lower.includes('run') || lower.includes('execution')) {
+      entity = 'run';
+    } else if (lower.includes('person') || lower.includes('people') || lower.includes('pessoa')) {
+      entity = 'person';
+    } else if (lower.includes('object') || lower.includes('objeto') || lower.includes('item')) {
+      entity = 'object';
+    } else if (lower.includes('idea') || lower.includes('ideia') || lower.includes('proposal')) {
+      entity = 'idea';
+    } else if (lower.includes('system') || lower.includes('status') || lower.includes('overview')) {
+      entity = 'system';
+    }
+
+    // Extract filters (simple keyword extraction for now)
+    const filters: Record<string, any> = {};
+    // Could be enhanced with NER or more sophisticated parsing
+
+    return {
+      vector: {
+        action,
+        entity,
+        filters,
+      },
+    };
+  }
+
+  /**
+   * Fetch data preview from Registry based on atomic intent
+   */
+  private async fetchDataPreview(atomicIntent: {
+    vector: {
+      action: string;
+      entity: string;
+      filters: Record<string, any>;
+    };
+  }): Promise<{
+    count: number;
+    sample: any[];
+    meta?: Record<string, any>;
+  }> {
+    const { action, entity, filters } = atomicIntent.vector;
+
+    try {
+      if (entity === 'contract') {
+        const contracts = await this.contractsService.findAll({ limit: 10 });
+        return {
+          count: contracts.total || contracts.data?.length || 0,
+          sample: (contracts.data || []).slice(0, 5).map((c: any) => ({
+            id: c.id?.substring(0, 12).toUpperCase() || 'N/A',
+            title: c.titulo || 'Untitled',
+            status: c.estado || 'RASCUNHO',
+            value: c.valor_total_cents ? `R$ ${(c.valor_total_cents / 100).toFixed(2)}` : 'N/A',
+            parties: `${c.autor_logline_id?.substring(0, 15) || 'Unknown'} <> ${c.contraparte_logline_id?.substring(0, 15) || 'Unknown'}`,
+          })),
+          meta: {
+            total_value_cents: contracts.data?.reduce((sum: number, c: any) => sum + (c.valor_total_cents || 0), 0) || 0,
+            active_count: contracts.data?.filter((c: any) => c.estado === 'VIGENTE').length || 0,
+          },
+        };
+      }
+
+      if (entity === 'person') {
+        const people = await this.peopleService.search({});
+        return {
+          count: Array.isArray(people) ? people.length : 0,
+          sample: (Array.isArray(people) ? people : []).slice(0, 5).map((p: any) => ({
+            logline_id: p.logline_id || 'N/A',
+            name: p.name || 'Unknown',
+            email: p.email_primary || 'N/A',
+            role: p.tenant_relationships?.[0]?.role || 'N/A',
+          })),
+        };
+      }
+
+      if (entity === 'object') {
+        const objects = await this.objectsService.findAll({ limit: 10 });
+        const objectsData = objects.data || [];
+        return {
+          count: objects.total || objectsData.length,
+          sample: objectsData.slice(0, 5).map((o: any) => ({
+            id: o.id?.substring(0, 12).toUpperCase() || 'N/A',
+            name: o.name || 'Untitled',
+            type: o.object_type || 'N/A',
+            location: o.location || 'N/A',
+            custodian: o.current_custodian_logline_id?.substring(0, 15) || 'N/A',
+          })),
+        };
+      }
+
+      if (entity === 'idea') {
+        const ideas = await this.ideasService.findAll({ tenant_id: filters.tenant_id, limit: 10 });
+        return {
+          count: ideas.total || ideas.data?.length || 0,
+          sample: (ideas.data || []).slice(0, 5).map((i: any) => ({
+            id: i.id?.substring(0, 12).toUpperCase() || 'N/A',
+            title: i.titulo || 'Untitled',
+            priority: i.prioridade_consensual || 0,
+            cost: i.custo_estimado_cents ? `R$ ${(i.custo_estimado_cents / 100).toFixed(2)}` : 'N/A',
+            status: i.status || 'AGUARDANDO_VOTOS',
+          })),
+          meta: {
+            total_budget_cents: ideas.data?.reduce((sum: number, i: any) => sum + (i.custo_estimado_cents || 0), 0) || 0,
+          },
+        };
+      }
+
+      if (entity === 'agent') {
+        const agents = await this.agentsRegistryService.findAll({ limit: 10 });
+        const agentsData = agents.data || [];
+        return {
+          count: agents.total || agentsData.length,
+          sample: agentsData.slice(0, 5).map((a: any) => ({
+            logline_id: a.logline_agent_id || 'N/A',
+            name: a.name || 'Unknown',
+            model: a.model_profile?.model || 'N/A',
+            status: a.onboarding_status || 'INACTIVE',
+            runs: a.total_runs || 0,
+          })),
+        };
+      }
+
+      // Default: empty preview
+      return {
+        count: 0,
+        sample: [],
+        meta: {},
+      };
+    } catch (error) {
+      console.warn('Failed to fetch data preview, using empty:', error);
+      return {
+        count: 0,
+        sample: [],
+        meta: {},
+      };
+    }
+  }
+
+  /**
+   * Determine vibe based on prompt and intent
+   */
+  private determineVibe(prompt: string, atomicIntent: any): 'business' | 'zen' | 'cyber' {
+    const lower = prompt.toLowerCase();
+    
+    if (lower.includes('debug') || lower.includes('error') || lower.includes('trace')) {
+      return 'cyber';
+    }
+    if (lower.includes('cost') || lower.includes('budget') || lower.includes('financial')) {
+      return 'business';
+    }
+    if (atomicIntent.vector.action === 'debug') {
+      return 'cyber';
+    }
+    
+    return 'business'; // Default
   }
 
   private async generateRegistryContractsLayout(): Promise<any> {
