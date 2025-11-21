@@ -451,7 +451,68 @@ CREATE TABLE app_actions (
 );
 ```
 
-### 4.4. Policies (Phase 4)
+### 4.4. Registry (Phase 5 - Planned)
+
+```sql
+-- Registry de Apps (para descoberta e compartilhamento)
+CREATE TABLE registry_apps (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  namespace       TEXT NOT NULL, -- '@owner/app-id'
+  version         TEXT NOT NULL, -- '1.0.0'
+  app_id          VARCHAR(255) NOT NULL, -- ID do app original
+  manifest        JSONB NOT NULL, -- Manifest completo
+  owner_id        UUID NOT NULL, -- User/org que publicou
+  tenant_id       UUID, -- Tenant de origem (opcional)
+  visibility      TEXT NOT NULL DEFAULT 'public', -- 'public' | 'org'
+  downloads       INTEGER NOT NULL DEFAULT 0,
+  rating          DECIMAL(3,2), -- 0.00 a 5.00
+  rating_count    INTEGER NOT NULL DEFAULT 0,
+  description     TEXT,
+  readme          TEXT, -- Markdown README
+  tags            TEXT[], -- ['support', 'triage', 'automation']
+  dependencies    JSONB, -- [{namespace: '@logline/core-tools', version: '^1.0.0'}]
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  published_at    TIMESTAMPTZ,
+  UNIQUE(namespace, version)
+);
+
+CREATE INDEX idx_registry_apps_namespace ON registry_apps(namespace);
+CREATE INDEX idx_registry_apps_visibility ON registry_apps(visibility);
+CREATE INDEX idx_registry_apps_tags ON registry_apps USING GIN(tags);
+CREATE INDEX idx_registry_apps_rating ON registry_apps(rating DESC);
+
+-- Reviews/Ratings
+CREATE TABLE registry_reviews (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  registry_app_id UUID NOT NULL REFERENCES registry_apps(id),
+  user_id         UUID NOT NULL,
+  tenant_id       UUID,
+  rating          INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  review          TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(registry_app_id, user_id)
+);
+
+-- Instalações
+CREATE TABLE registry_installations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  registry_app_id UUID NOT NULL REFERENCES registry_apps(id),
+  installed_app_id VARCHAR(255) NOT NULL, -- ID do app instalado no tenant
+  tenant_id       UUID NOT NULL,
+  user_id         UUID NOT NULL, -- Quem instalou
+  version         TEXT NOT NULL,
+  installed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_registry_installations_tenant ON registry_installations(tenant_id);
+CREATE INDEX idx_registry_installations_registry_app ON registry_installations(registry_app_id);
+```
+
+**Nota:** Esta seção será implementada na Phase 5. Veja [REGISTRY_PROPOSAL.md](./docs/design/REGISTRY_PROPOSAL.md) para detalhes completos.
+
+### 4.5. Policies (Phase 4)
 
 ```sql
 CREATE TABLE policies (
