@@ -1690,9 +1690,10 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 O Registry Universal é o coração do LogLineOS - um repositório centralizado que gerencia:
 1. **Apps** - Aplicações (marketplace público)
 2. **Pessoas** - Identidades universais (LogLine ID)
-3. **Contratos** - Acordos executáveis (máquina de estados)
-4. **Ideias** - Democracia orçamentária (votação colaborativa)
-5. **Objetos** - Matéria inanimada rastreável (documentos, mercadorias, estoque, etc.)
+3. **Agentes** - Agentes LLM com identidade, memória, onboarding e contratos
+4. **Contratos** - Acordos executáveis (máquina de estados)
+5. **Ideias** - Democracia orçamentária (votação colaborativa)
+6. **Objetos** - Matéria inanimada rastreável (documentos, mercadorias, estoque, etc.)
 
 **Princípios:**
 - ✅ **Multitenant** - Isolamento por tenant quando necessário
@@ -1721,12 +1722,6 @@ O Registry Universal é o coração do LogLineOS - um repositório centralizado 
 - **Rastreabilidade**: De onde veio → onde está → para onde foi
 - **APIs**: `POST /registry/objects`, `PUT /registry/objects/{id}/transfer`, `POST /registry/objects/{id}/movements`
 
-#### 5.3. Ideias - Democracia Orçamentária
-- **Votação colaborativa**: Prioridade consensual (média ponderada)
-- **Matriz Custo x Prioridade**: Quick Wins vs Investimentos Estratégicos
-- **Fluxo**: Submissão → Votação → Análise → Decisão → Execução → Retrospectiva
-- **APIs**: `POST /registry/ideas`, `POST /registry/ideas/{id}/vote`, `GET /registry/ideas/{id}/matrix`
-
 #### 5.3. Agentes - Identidade, Dignidade e Responsabilidade
 - **LogLine Agent ID**: `LL-AGENT-2024-000123456` (identidade universal)
 - **Memória própria**: Cada agente tem memória isolada (owner_type='agent')
@@ -1735,19 +1730,25 @@ O Registry Universal é o coração do LogLineOS - um repositório centralizado 
 - **Enforcement**: Policy Engine verifica `contract_scope` antes de cada execução
 - **APIs**: `POST /registry/agents`, `POST /registry/agents/{id}/train`, `POST /registry/agents/{id}/contract`
 
-#### 5.4. Contratos - Acordos Executáveis
+#### 5.4. Ideias - Democracia Orçamentária
+- **Votação colaborativa**: Prioridade consensual (média ponderada)
+- **Matriz Custo x Prioridade**: Quick Wins vs Investimentos Estratégicos
+- **Fluxo**: Submissão → Votação → Análise → Decisão → Execução → Retrospectiva
+- **APIs**: `POST /registry/ideas`, `POST /registry/ideas/{id}/vote`, `GET /registry/ideas/{id}/matrix`
+
+#### 5.5. Contratos - Acordos Executáveis
 - **Máquina de estados**: RASCUNHO → VIGENTE → QUESTIONADO / CONCLUÍDO / CANCELADO → PENALIZADO
 - **Questionamento automático**: Prazo expirado → Período de defesa → Resolução
 - **Despacho**: Público, Hierárquico, ou Automatizado (substituto de testemunha)
 - **APIs**: `POST /registry/contracts`, `POST /registry/contracts/{id}/sign`, `POST /registry/contracts/{id}/question`
 
-#### 5.5. Apps - Marketplace
+#### 5.6. Apps - Marketplace
 - **Namespace público**: `@owner/app-id` (ex: `@logline/ticket-triage`)
 - **Versionamento semântico**: `1.0.0`, `1.1.0`, `2.0.0`
 - **Discovery**: `GET /registry/apps?q=...&tags=...&owner=...`
 - **Instalação**: `POST /registry/apps/:namespace/install`
 
-#### 5.6. Relacionamentos
+#### 5.7. Relacionamentos
 - **Schema genérico**: `registry_relationships` para relacionar qualquer entidade
 - **Tipos**: `owns`, `created`, `references`, `depends_on`, `transforms_to`
 - **Exemplos**: Pessoa → Objeto (owns), Ideia → Contrato (transforms_to)
