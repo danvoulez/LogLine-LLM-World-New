@@ -108,6 +108,94 @@ export class ToolRuntimeService {
       throw new ToolNotFoundException(toolId, logContext);
     }
 
+    // Policy Engine v1 check (BEFORE app scope check)
+    try {
+      const policyDecision = await this.policyEngineV1.checkToolCall(toolId, {
+        runId: context.runId,
+        appId: context.appId,
+        userId: context.userId,
+        tenantId: context.tenantId,
+      });
+
+      if (!policyDecision.allowed) {
+        // Log policy denial
+        await this.eventRepository.save({
+          run_id: context.runId,
+          step_id: context.stepId,
+          kind: EventKind.POLICY_EVAL,
+          payload: {
+            action: 'tool_call',
+            tool_id: toolId,
+            app_id: context.appId,
+            user_id: context.userId,
+            tenant_id: context.tenantId,
+            result: 'denied',
+            reason: policyDecision.reason || 'Policy denied tool call',
+          },
+        });
+
+        this.logger.warn(
+          `Policy denied tool call: ${toolId}`,
+          undefined,
+          { ...logContext, reason: policyDecision.reason },
+        );
+
+        if (policyDecision.requiresApproval) {
+          throw new ScopeDeniedException(
+            context.appId || 'system',
+            'tool',
+            toolId,
+            logContext,
+          );
+        }
+
+        throw new ScopeDeniedException(
+          context.appId || 'system',
+          'tool',
+          toolId,
+          logContext,
+        );
+      }
+
+      // Log policy allowance
+      await this.eventRepository.save({
+        run_id: context.runId,
+        step_id: context.stepId,
+        kind: EventKind.POLICY_EVAL,
+        payload: {
+          action: 'tool_call',
+          tool_id: toolId,
+          app_id: context.appId,
+          user_id: context.userId,
+          tenant_id: context.tenantId,
+          result: 'allowed',
+          reason: policyDecision.reason || 'Policy allows tool call',
+        },
+      });
+
+      // Apply policy modifications if any (e.g., mode override, limits)
+      if (policyDecision.modifiedContext) {
+        // For now, we log modifications but don't change the execution context
+        // Future: could adjust context based on modifications
+        this.logger.debug(
+          `Policy modified context for tool call: ${toolId}`,
+          { ...logContext, modifications: policyDecision.modifiedContext },
+        );
+      }
+    } catch (error) {
+      // If policy check throws (e.g., tool/run not found), log and re-throw
+      if (error instanceof ScopeDeniedException) {
+        throw error;
+      }
+      this.logger.error(
+        `Policy check failed for tool: ${toolId}`,
+        error instanceof Error ? error.stack : String(error),
+        logContext,
+      );
+      // Don't block execution if policy check fails (fail open for now)
+      // In production, you might want to fail closed
+    }
+
     // Check app scope (if app context is provided)
     if (context.appId) {
       const hasScope = await this.scopeChecker.checkToolScope(

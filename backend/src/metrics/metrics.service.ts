@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Run, RunStatus } from '../runs/entities/run.entity';
 import { Event, EventKind } from '../runs/entities/event.entity';
 import { Step, StepStatus } from '../runs/entities/step.entity';
+import { EnhancedMetricsService, EnhancedMetricsSnapshot } from './enhanced-metrics.service';
 
 export interface MetricsSnapshot {
   timestamp: Date;
@@ -61,10 +62,18 @@ export class MetricsService {
     private eventRepository: Repository<Event>,
     @InjectRepository(Step)
     private stepRepository: Repository<Step>,
+    private enhancedMetrics: EnhancedMetricsService,
   ) {}
 
   /**
-   * Get current metrics snapshot
+   * Get enhanced metrics snapshot (recommended)
+   */
+  async getEnhancedMetricsSnapshot(tenantId?: string): Promise<EnhancedMetricsSnapshot> {
+    return this.enhancedMetrics.getEnhancedMetricsSnapshot(tenantId);
+  }
+
+  /**
+   * Get current metrics snapshot (legacy - for backward compatibility)
    */
   async getMetricsSnapshot(tenantId?: string): Promise<MetricsSnapshot> {
     const today = new Date();
@@ -302,9 +311,12 @@ export class MetricsService {
   }
 
   /**
-   * Get metrics in Prometheus format
+   * Get metrics in Prometheus format (enhanced if available)
    */
-  async getPrometheusMetrics(tenantId?: string): Promise<string> {
+  async getPrometheusMetrics(tenantId?: string, enhanced: boolean = true): Promise<string> {
+    if (enhanced) {
+      return this.enhancedMetrics.getPrometheusMetrics(tenantId);
+    }
     const metrics = await this.getMetricsSnapshot(tenantId);
     const lines: string[] = [];
 

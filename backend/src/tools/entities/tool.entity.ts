@@ -26,6 +26,12 @@ export class Tool {
   @Column('jsonb', { nullable: true })
   handler_config: Record<string, any>; // Handler-specific config
 
+  @Column('varchar', { length: 20, default: 'low' })
+  risk_level: 'low' | 'medium' | 'high'; // Risk level for policy enforcement
+
+  @Column('text', { array: true, default: () => 'ARRAY[]::text[]' })
+  side_effects: string[]; // Array of side effects (e.g., 'database_write', 'memory_storage')
+
   @CreateDateColumn()
   created_at: Date;
 

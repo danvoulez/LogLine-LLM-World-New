@@ -110,15 +110,8 @@ export class NaturalLanguageDbTool {
       id: 'natural_language_db_read',
       description: 'Query the database using natural language. READ-ONLY operations. Converts your question to SQL SELECT queries.',
       execute: async (input: { query: string }, context: ToolContext) => {
-        // TODO: Policy check (Phase 4)
-        // const allowed = await this.policyEngine.checkToolCall(
-        //   'natural_language_db_read',
-        //   context.runId,
-        //   context.appId,
-        // );
-        // if (!allowed) {
-        //   throw new Error('Policy denied: Database read access not allowed');
-        // }
+        // Policy check is handled by ToolRuntimeService before calling this handler
+        // No need to check here - if we reach this point, policy has already been evaluated
 
         // Use AI to convert natural language to SQL
         const result = await generateText({
@@ -212,15 +205,8 @@ Generate the SQL query:`,
         },
         context: ToolContext,
       ) => {
-        // TODO: Policy check (Phase 4)
-        // const allowed = await this.policyEngine.checkToolCall(
-        //   'natural_language_db_write',
-        //   context.runId,
-        //   context.appId,
-        // );
-        // if (!allowed) {
-        //   throw new Error('Policy denied: Database write access not allowed');
-        // }
+        // Policy check is handled by ToolRuntimeService before calling this handler
+        // No need to check here - if we reach this point, policy has already been evaluated
 
         // Validate app scope (write operations should be scoped to specific apps)
         if (!context.appId) {

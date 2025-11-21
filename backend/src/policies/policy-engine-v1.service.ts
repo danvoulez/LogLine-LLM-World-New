@@ -140,7 +140,8 @@ export class PolicyEngineV1Service {
       };
     }
 
-    const riskLevel = (tool as any).risk_level || (tool as any).metadata?.risk_level || 'low';
+    // Get risk_level from tool entity (now a direct column)
+    const riskLevel = tool.risk_level || 'low';
 
     const evaluationContext: PolicyEvaluationContext = {
       userId: context.userId,
@@ -151,6 +152,42 @@ export class PolicyEngineV1Service {
       runId: context.runId,
       mode: run.mode,
       riskLevel,
+    };
+
+    return this.evaluatePolicies(evaluationContext);
+  }
+
+  /**
+   * Check if an agent can be called
+   */
+  async checkAgentCall(
+    agentId: string,
+    context: {
+      runId: string;
+      appId?: string;
+      userId?: string;
+      tenantId: string;
+    },
+  ): Promise<PolicyDecision> {
+    // Load agent and run for context
+    const agent = await this.agentRepository.findOne({ where: { id: agentId } });
+    const run = await this.runRepository.findOne({ where: { id: context.runId } });
+
+    if (!agent || !run) {
+      return {
+        allowed: false,
+        reason: `Agent ${agentId} or run ${context.runId} not found`,
+      };
+    }
+
+    const evaluationContext: PolicyEvaluationContext = {
+      userId: context.userId,
+      tenantId: context.tenantId,
+      appId: context.appId,
+      action: 'workflow_execution', // Agent calls are part of workflow execution
+      agentId,
+      runId: context.runId,
+      mode: run.mode,
     };
 
     return this.evaluatePolicies(evaluationContext);

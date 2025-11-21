@@ -16,6 +16,8 @@ import { AgentExecutionException } from '../common/exceptions/agent-execution.ex
 import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
 import { BudgetTrackerService } from '../execution/budget-tracker.service';
 import { MemoryService } from '../memory/memory.service';
+import { PolicyEngineV1Service } from '../policies/policy-engine-v1.service';
+import { ScopeDeniedException } from '../common/exceptions/scope-denied.exception';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -59,6 +61,7 @@ export class AgentRuntimeService {
     private agentInputValidator: AgentInputValidatorService,
     private budgetTracker: BudgetTrackerService,
     private memoryService: MemoryService,
+    private policyEngineV1: PolicyEngineV1Service,
   ) {}
 
   async runAgentStep(
@@ -118,6 +121,92 @@ export class AgentRuntimeService {
     if (!agent) {
       this.logger.error(`Agent not found: ${agentId}`, undefined, logContext);
       throw new AgentNotFoundException(agentId, logContext);
+    }
+
+    // Policy Engine v1 check (BEFORE agent execution)
+    try {
+      const policyDecision = await this.policyEngineV1.checkAgentCall(agentId, {
+        runId: context.runId,
+        appId: context.appId,
+        userId: context.userId,
+        tenantId: context.tenantId,
+      });
+
+      if (!policyDecision.allowed) {
+        // Log policy denial
+        await this.eventRepository.save({
+          run_id: context.runId,
+          step_id: context.stepId,
+          kind: EventKind.POLICY_EVAL,
+          payload: {
+            action: 'agent_call',
+            agent_id: agentId,
+            app_id: context.appId,
+            user_id: context.userId,
+            tenant_id: context.tenantId,
+            result: 'denied',
+            reason: policyDecision.reason || 'Policy denied agent call',
+          },
+        });
+
+        this.logger.warn(
+          `Policy denied agent call: ${agentId}`,
+          undefined,
+          { ...logContext, reason: policyDecision.reason },
+        );
+
+        if (policyDecision.requiresApproval) {
+          throw new ScopeDeniedException(
+            context.appId || 'system',
+            'agent',
+            agentId,
+            logContext,
+          );
+        }
+
+        throw new ScopeDeniedException(
+          context.appId || 'system',
+          'agent',
+          agentId,
+          logContext,
+        );
+      }
+
+      // Log policy allowance
+      await this.eventRepository.save({
+        run_id: context.runId,
+        step_id: context.stepId,
+        kind: EventKind.POLICY_EVAL,
+        payload: {
+          action: 'agent_call',
+          agent_id: agentId,
+          app_id: context.appId,
+          user_id: context.userId,
+          tenant_id: context.tenantId,
+          result: 'allowed',
+          reason: policyDecision.reason || 'Policy allows agent call',
+        },
+      });
+
+      // Apply policy modifications if any
+      if (policyDecision.modifiedContext) {
+        this.logger.debug(
+          `Policy modified context for agent call: ${agentId}`,
+          { ...logContext, modifications: policyDecision.modifiedContext },
+        );
+      }
+    } catch (error) {
+      // If policy check throws (e.g., agent/run not found), log and re-throw
+      if (error instanceof ScopeDeniedException) {
+        throw error;
+      }
+      this.logger.error(
+        `Policy check failed for agent: ${agentId}`,
+        error instanceof Error ? error.stack : String(error),
+        logContext,
+      );
+      // Don't block execution if policy check fails (fail open for now)
+      // In production, you might want to fail closed
     }
 
     // Load allowed tools

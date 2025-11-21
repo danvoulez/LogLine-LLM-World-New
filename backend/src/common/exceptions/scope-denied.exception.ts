@@ -7,7 +7,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 export class ScopeDeniedException extends HttpException {
   constructor(
     public readonly appId: string | undefined,
-    public readonly scopeType: 'tool' | 'memory' | 'external',
+    public readonly scopeType: 'tool' | 'memory' | 'external' | 'agent',
     public readonly scopeValue: string,
     context?: Record<string, any>,
   ) {

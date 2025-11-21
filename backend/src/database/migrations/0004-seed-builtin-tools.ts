@@ -14,7 +14,7 @@ export class SeedBuiltinTools1700000000004 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Natural Language DB Read Tool
     await queryRunner.query(`
-      INSERT INTO tools (id, name, description, input_schema, handler_type, handler_config, created_at, updated_at)
+      INSERT INTO tools (id, name, description, input_schema, handler_type, handler_config, risk_level, side_effects, created_at, updated_at)
       VALUES (
         'natural_language_db_read',
         'Natural Language DB Read',
@@ -31,6 +31,8 @@ export class SeedBuiltinTools1700000000004 implements MigrationInterface {
         }'::jsonb,
         'builtin',
         '{"handler": "natural_language_db_read"}'::jsonb,
+        'medium',
+        ARRAY['database_read']::text[],
         NOW(),
         NOW()
       )
@@ -45,7 +47,7 @@ export class SeedBuiltinTools1700000000004 implements MigrationInterface {
 
     // Natural Language DB Write Tool
     await queryRunner.query(`
-      INSERT INTO tools (id, name, description, input_schema, handler_type, handler_config, created_at, updated_at)
+      INSERT INTO tools (id, name, description, input_schema, handler_type, handler_config, risk_level, side_effects, created_at, updated_at)
       VALUES (
         'natural_language_db_write',
         'Natural Language DB Write',
@@ -72,6 +74,8 @@ export class SeedBuiltinTools1700000000004 implements MigrationInterface {
         }'::jsonb,
         'builtin',
         '{"handler": "natural_language_db_write"}'::jsonb,
+        'high',
+        ARRAY['database_write', 'data_modification']::text[],
         NOW(),
         NOW()
       )
@@ -86,7 +90,7 @@ export class SeedBuiltinTools1700000000004 implements MigrationInterface {
 
     // Ticketing List Open Tool (Placeholder)
     await queryRunner.query(`
-      INSERT INTO tools (id, name, description, input_schema, handler_type, handler_config, created_at, updated_at)
+      INSERT INTO tools (id, name, description, input_schema, handler_type, handler_config, risk_level, side_effects, created_at, updated_at)
       VALUES (
         'ticketing.list_open',
         'List Open Tickets',
@@ -111,6 +115,8 @@ export class SeedBuiltinTools1700000000004 implements MigrationInterface {
         }'::jsonb,
         'builtin',
         '{"handler": "ticketing.list_open", "placeholder": true}'::jsonb,
+        'low',
+        ARRAY[]::text[],
         NOW(),
         NOW()
       )

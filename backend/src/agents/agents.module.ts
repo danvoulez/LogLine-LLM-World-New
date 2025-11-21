@@ -17,6 +17,7 @@ import { MemoryModule } from '../memory/memory.module';
 import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
 import { AtomicValidatorService } from './validators/atomic-validator.service';
 import { RunsModule } from '../runs/runs.module';
+import { PoliciesModule } from '../policies/policies.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RunsModule } from '../runs/runs.module';
     TdlnTModule,
     MemoryModule, // Memory & RAG for agent context
     RunsModule, // Import to access BudgetTrackerService
+    PoliciesModule, // Import to access PolicyEngineV1Service
   ],
   controllers: [AgentsController],
   providers: [

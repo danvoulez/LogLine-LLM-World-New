@@ -63,9 +63,25 @@ export class MemoryTool {
         },
       },
       handler: async (input: any, context: ToolContext) => {
+        // Validate and enforce tenant/user/app ownership
+        let finalOwnerId = input.owner_id;
+        if (input.owner_type === 'tenant') {
+          // Force tenant_id from context
+          finalOwnerId = context.tenantId;
+        } else if (input.owner_type === 'user' && context.userId) {
+          // Force user_id from context if available
+          finalOwnerId = context.userId;
+        } else if (input.owner_type === 'app' && context.appId) {
+          // Validate app_id matches context
+          if (input.owner_id !== context.appId) {
+            throw new Error(`App ID mismatch: cannot store memory for app ${input.owner_id} from context app ${context.appId}`);
+          }
+          finalOwnerId = context.appId;
+        }
+
         const result = await this.memoryService.storeMemory({
           owner_type: input.owner_type as MemoryOwnerType,
-          owner_id: input.owner_id,
+          owner_id: finalOwnerId,
           type: input.type as MemoryType,
           content: input.content,
           metadata: input.metadata,
@@ -136,9 +152,25 @@ export class MemoryTool {
         },
       },
       handler: async (input: any, context: ToolContext) => {
+        // Validate and enforce tenant/user/app ownership
+        let finalOwnerId = input.owner_id;
+        if (input.owner_type === 'tenant') {
+          // Force tenant_id from context
+          finalOwnerId = context.tenantId;
+        } else if (input.owner_type === 'user' && context.userId) {
+          // Force user_id from context if available
+          finalOwnerId = context.userId;
+        } else if (input.owner_type === 'app' && context.appId) {
+          // Validate app_id matches context
+          if (input.owner_id !== context.appId) {
+            throw new Error(`App ID mismatch: cannot retrieve memory for app ${input.owner_id} from context app ${context.appId}`);
+          }
+          finalOwnerId = context.appId;
+        }
+
         const memories = await this.memoryService.retrieveMemory(
           input.owner_type as MemoryOwnerType,
-          input.owner_id,
+          finalOwnerId,
           input.type as MemoryType | undefined,
           input.limit || 50,
         );
@@ -222,10 +254,31 @@ export class MemoryTool {
         },
       },
       handler: async (input: any, context: ToolContext) => {
+        // Validate and enforce tenant/user/app ownership
+        let finalOwnerType = input.owner_type as MemoryOwnerType | undefined;
+        let finalOwnerId = input.owner_id;
+        
+        if (input.owner_type === 'tenant') {
+          // Force tenant_id from context
+          finalOwnerType = 'tenant';
+          finalOwnerId = context.tenantId;
+        } else if (input.owner_type === 'user' && context.userId) {
+          // Force user_id from context if available
+          finalOwnerType = 'user';
+          finalOwnerId = context.userId;
+        } else if (input.owner_type === 'app' && context.appId) {
+          // Validate app_id matches context
+          if (input.owner_id && input.owner_id !== context.appId) {
+            throw new Error(`App ID mismatch: cannot search memory for app ${input.owner_id} from context app ${context.appId}`);
+          }
+          finalOwnerType = 'app';
+          finalOwnerId = context.appId;
+        }
+
         const results = await this.memoryService.searchMemory({
           query: input.query,
-          owner_type: input.owner_type as MemoryOwnerType | undefined,
-          owner_id: input.owner_id,
+          owner_type: finalOwnerType,
+          owner_id: finalOwnerId,
           type: input.type as MemoryType | undefined,
           limit: input.limit || 10,
           threshold: input.threshold || 0.7,
@@ -270,6 +323,9 @@ export class MemoryTool {
         },
       },
       handler: async (input: any, context: ToolContext) => {
+        // Note: Delete operation doesn't have owner_type/owner_id in input
+        // We rely on the memory service to validate ownership if needed
+        // For now, we allow deletion - future enhancement could add ownership validation
         await this.memoryService.deleteMemory(input.memory_id);
         return { deleted: true };
       },
