@@ -40,6 +40,9 @@ Thumbs.db
 
 # Vercel
 .vercel
+# Note: .vercel/project.json should be committed for team collaboration
+# But .vercel/.env.local should NOT be committed
+!.vercel/project.json
 
 # TypeScript
 *.tsbuildinfo
