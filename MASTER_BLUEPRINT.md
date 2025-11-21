@@ -2,11 +2,16 @@
 
 > A **cloud‑native LLM-first Agent OS** + **App platform** built for Vercel deployment.
 
-**Version:** 2.4  
-**Last Updated:** 2024-11-21  
+**Version:** 2.5  
+**Last Updated:** 2024-12-19  
 **Deployment Target:** Vercel (Serverless) + Vercel Postgres
 
 **Recent Updates:**
+* ✅ **Phase 4 Critical Fixes COMPLETE**: Policy Engine v1 fully integrated into ToolRuntimeService and AgentRuntimeService
+* ✅ **Tools Governance**: Added `risk_level` (low/medium/high) and `side_effects` columns to tools table
+* ✅ **Policy Enforcement**: All tool calls and agent calls now pass through Policy Engine v1 before execution
+* ✅ **Memory Security**: Added tenant/user/app ownership validation to Memory tools (prevents data exfiltration)
+* ✅ **Deep Code Audit Round 2 Fixes**: Cron Jobs for Vercel Serverless, API Key performance, Resume Run, Memory search metadata filtering, Race condition fixes, File size validation
 * ✅ **Phase 4 COMPLETE**: Memory Engine, Policy Engine v1, Auth & RBAC, Audit, Metrics, Alerts, Rate Limiting, Cron Jobs
 * ✅ **Test Coverage**: 12 new test files (53 new tests, 209 total tests, all passing)
 * ✅ **Codebase Review**: Complete review with principles verification (LLM-first: 9/10, Enterprise Safety: 10/10)
@@ -147,6 +152,7 @@ Responsible for *actually doing work*.
 
 * **Agent Runtime**
   * Builds prompts from agent config, context, tools.
+  * **Policy Engine v1 integration**: All agent calls pass through `PolicyEngineV1Service.checkAgentCall()` before execution.
   * Calls LLM Router via AI SDK.
   * Handles tool calling loops automatically (AI SDK feature).
   * Streaming support for real-time responses.
@@ -378,18 +384,19 @@ This transforms healthy paranoia into something computable and LogLine-core.
 
 ```sql
 CREATE TABLE tools (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT NOT NULL,
+  id            VARCHAR(255) PRIMARY KEY, -- e.g., 'natural_language_db_read', 'ticketing.list_open'
+  name          VARCHAR(255) NOT NULL,
   description   TEXT,
-  input_schema  JSONB NOT NULL,
-  output_schema JSONB NOT NULL,
-  handler_ref   TEXT NOT NULL,
-  risk_level    TEXT NOT NULL DEFAULT 'low', -- low|medium|high
-  side_effects  TEXT[] NOT NULL DEFAULT '{}', -- ['writes_db', 'sends_email', ...]
-  owner         TEXT,
-  version       TEXT NOT NULL DEFAULT '1.0.0',
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  input_schema  JSONB NOT NULL, -- JSON Schema for tool inputs
+  handler_type  VARCHAR(50), -- 'code', 'http', 'builtin'
+  handler_config JSONB, -- Handler-specific config
+  risk_level    VARCHAR(20) NOT NULL DEFAULT 'low' CHECK (risk_level IN ('low', 'medium', 'high')),
+  side_effects  TEXT[] NOT NULL DEFAULT '{}', -- ['database_read', 'database_write', 'memory_storage', ...]
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_tools_risk_level ON tools(risk_level);
 
 CREATE TABLE agents (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -471,19 +478,38 @@ To keep the system auditable and predictable, policies in v1 have restricted sem
 
 **Evaluation Order:**
 
-1. Before executing a tool or agent, the orchestrator calls the Policy Engine with:
+1. **Run Start**: Before starting a workflow run, `OrchestratorService.startRun()` calls `PolicyEngineV1Service.checkRunStart()` with:
    - `subject` (user_id, tenant_id, app_id)
-   - `action` (e.g., `tool_call`, `run_start`)
-   - `resource` (tool_id, workflow_id, agent_id)
-   - `context` (mode, risk_level, etc.)
+   - `action`: `run_start`
+   - `resource` (workflow_id)
+   - `context` (mode, input)
 
-2. If any policy returns `deny` → operation aborted and `policy_eval` + `error` event logged.
+2. **Tool Call**: Before executing any tool, `ToolRuntimeService.callTool()` calls `PolicyEngineV1Service.checkToolCall()` with:
+   - `subject` (user_id, tenant_id, app_id)
+   - `action`: `tool_call`
+   - `resource` (tool_id)
+   - `context` (run_id, mode, risk_level from tool entity)
 
-3. If returns `require_approval` → the run enters `status = "paused"` with a `human_gate`.
+3. **Agent Call**: Before executing any agent, `AgentRuntimeService.runAgentStep()` calls `PolicyEngineV1Service.checkAgentCall()` with:
+   - `subject` (user_id, tenant_id, app_id)
+   - `action`: `workflow_execution`
+   - `resource` (agent_id)
+   - `context` (run_id, mode)
 
-4. `modify` can only alter control fields (mode, limits, flags), never domain data.
+4. If any policy returns `deny` → operation aborted and `policy_eval` + `error` event logged.
 
-This eliminates ambiguity that would become a headache in the future.
+5. If returns `require_approval` → the run enters `status = "paused"` with a `human_gate`. Use `PATCH /runs/:id/resume` to continue after approval.
+
+6. `modify` can only alter control fields (mode, limits, flags), never domain data.
+
+**Implementation Status:**
+- ✅ Policy Engine v1 fully integrated into `ToolRuntimeService` (all tool calls are policy-checked)
+- ✅ Policy Engine v1 fully integrated into `AgentRuntimeService` (all agent calls are policy-checked)
+- ✅ Policy Engine v1 integrated into `OrchestratorService` (run starts are policy-checked)
+- ✅ Tools have `risk_level` column (low/medium/high) used by policies
+- ✅ All policy decisions are logged as `POLICY_EVAL` events
+
+This eliminates ambiguity and ensures all tool/agent executions pass through governance.
 
 ### 4.5. Memory Items (Phase 4 - with pgvector)
 
