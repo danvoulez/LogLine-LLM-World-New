@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, IsBoolean, IsObject, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PolicyScope, PolicyEffect, PolicyRuleExpr, PolicyOperator } from '../entities/policy.entity';
+import type { PolicyScope, PolicyEffect, PolicyRuleExpr, PolicyOperator } from '../entities/policy.entity';
 
 export class PolicyConditionDto {
   @IsString()
