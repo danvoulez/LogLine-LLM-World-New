@@ -9,7 +9,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - apps, app_scopes, app_workflows, app_actions (app layer)
  * - files (file storage)
  * 
- * IMPORTANT: This migration must run AFTER 0001 (enable-pgvector) and BEFORE 0002 (default agents)
+ * IMPORTANT: This migration must run AFTER 0001 (enable-pgvector) and BEFORE 0005 (default agents)
  */
 export class CreateCoreTables1700000000003 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -59,11 +59,12 @@ export class CreateCoreTables1700000000003 implements MigrationInterface {
         run_id       UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
         node_id      VARCHAR(255) NOT NULL,
         type         VARCHAR(20) NOT NULL CHECK (type IN ('static', 'tool', 'agent', 'router', 'human_gate')),
-        status       VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
+        status       VARCHAR(20) NOT NULL DEFAULT 'pending',
         input        JSONB,
         output       JSONB,
         started_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        finished_at  TIMESTAMPTZ
+        finished_at  TIMESTAMPTZ,
+        CONSTRAINT steps_status_check CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped'))
       );
     `);
 
@@ -73,9 +74,23 @@ export class CreateCoreTables1700000000003 implements MigrationInterface {
         id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         run_id   UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
         step_id  UUID REFERENCES steps(id) ON DELETE SET NULL,
-        kind     VARCHAR(50) NOT NULL CHECK (kind IN ('run_started', 'run_completed', 'run_failed', 'step_started', 'step_completed', 'step_failed', 'tool_call', 'llm_call', 'policy_eval', 'error')),
+        kind     VARCHAR(50) NOT NULL,
         payload  JSONB NOT NULL,
-        ts       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        ts       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT events_kind_check CHECK (
+          kind IN (
+            'run_started',
+            'run_completed',
+            'run_failed',
+            'step_started',
+            'step_completed',
+            'step_failed',
+            'tool_call',
+            'llm_call',
+            'policy_eval',
+            'error'
+          )
+        )
       );
     `);
 

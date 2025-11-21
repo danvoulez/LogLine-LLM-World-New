@@ -1,7 +1,11 @@
-import { IsString, IsOptional, IsUUID, IsNumber, Min } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, Min, Validate } from 'class-validator';
+import { isValidPath } from '../../common/utils/path-validator.util';
 
 export class CreateFileDto {
   @IsString()
+  @Validate((value: string) => isValidPath(value), {
+    message: 'Invalid file path: path traversal or dangerous characters detected',
+  })
   path: string;
 
   @IsString()

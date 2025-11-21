@@ -9,6 +9,7 @@ import { SchemaValidatorService } from '../common/validators/schema-validator.se
 import { LlmModule } from '../llm/llm.module';
 import { RunsModule } from '../runs/runs.module';
 import { AppsModule } from '../apps/apps.module';
+import { PoliciesModule } from '../policies/policies.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AppsModule } from '../apps/apps.module';
     LlmModule,
     RunsModule,
     AppsModule, // Import AppsModule to access AppScopeCheckerService
+    PoliciesModule, // Import PoliciesModule to access PolicyEngineV0Service
   ],
   controllers: [ToolsController],
   providers: [ToolRuntimeService, NaturalLanguageDbTool, SchemaValidatorService],

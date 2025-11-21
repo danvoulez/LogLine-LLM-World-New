@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { File } from './entities/file.entity';
 import { CreateFileDto } from './dto/create-file.dto';
+import { normalizeAndValidatePath } from '../common/utils/path-validator.util';
 
 @Injectable()
 export class FilesService {
@@ -12,8 +13,13 @@ export class FilesService {
   ) {}
 
   async create(createFileDto: CreateFileDto): Promise<File> {
+    // Path validation is done in DTO via class-validator
+    // Normalize path for consistency
+    const normalizedPath = normalizeAndValidatePath(createFileDto.path);
+    
     const file = this.fileRepository.create({
       ...createFileDto,
+      path: normalizedPath,
       size: Buffer.byteLength(createFileDto.content, 'utf8'),
     });
     return this.fileRepository.save(file);

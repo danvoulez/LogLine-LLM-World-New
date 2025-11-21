@@ -10,7 +10,9 @@ import { ValidationException } from '../common/exceptions/validation.exception';
 import { ScopeDeniedException } from '../common/exceptions/scope-denied.exception';
 import { SchemaValidatorService } from '../common/validators/schema-validator.service';
 import { AppScopeCheckerService } from '../apps/services/app-scope-checker.service';
+import { PolicyEngineV0Service } from '../policies/policy-engine-v0.service';
 import { RetryUtil } from '../common/utils/retry.util';
+import { sanitizeForLogging } from '../common/utils/sanitize.util';
 
 export interface ToolContext {
   runId: string;
@@ -35,6 +37,7 @@ export class ToolRuntimeService {
     private naturalLanguageDbTool: NaturalLanguageDbTool,
     private schemaValidator: SchemaValidatorService,
     private scopeChecker: AppScopeCheckerService,
+    private policyEngine: PolicyEngineV0Service,
   ) {
     this.registerBuiltinTools();
   }
@@ -76,7 +79,12 @@ export class ToolRuntimeService {
       tenant_id: context.tenantId,
     };
 
-    this.logger.log(`Calling tool: ${toolId}`, logContext);
+    // Sanitize input before logging to prevent PII leakage
+    const sanitizedInput = sanitizeForLogging(input);
+    this.logger.log(`Calling tool: ${toolId}`, {
+      ...logContext,
+      input: sanitizedInput,
+    });
 
     // Load tool from database
     const tool = await this.toolRepository.findOne({
@@ -138,11 +146,29 @@ export class ToolRuntimeService {
       });
     }
 
-    // TODO: Policy check (Phase 4)
-    // const allowed = await this.policyEngine.checkToolCall(toolId, context);
-    // if (!allowed) {
-    //   throw new Error(`Policy denied: Tool ${toolId} not allowed`);
-    // }
+      // Policy check (Policy Engine v0 - minimal rules before Phase 4)
+      const policyDecision = await this.policyEngine.checkToolCall(toolId, {
+        runId: context.runId,
+        appId: context.appId,
+        userId: context.userId,
+        tenantId: context.tenantId,
+      });
+
+      if (!policyDecision.allowed) {
+        this.logger.warn(
+          `Policy denied tool call: ${toolId}`,
+          {
+            toolId,
+            runId: context.runId,
+            appId: context.appId,
+            reason: policyDecision.reason,
+          },
+        );
+
+        throw new Error(
+          `Policy denied: ${policyDecision.reason || 'Tool call not allowed'}`,
+        );
+      }
 
     // Input validation using tool.input_schema
     let validatedInput = input;
@@ -232,17 +258,24 @@ export class ToolRuntimeService {
       );
     }
 
-    // Log successful tool call event
+    // Log successful tool call event (include query_classification if present)
+    const eventPayload: any = {
+      tool_id: toolId,
+      input: validatedInput,
+      output,
+      context: logContext,
+    };
+
+    // Add query_classification for natural language DB tools
+    if (toolId === 'natural_language_db_read' && output?.query_classification) {
+      eventPayload.query_classification = output.query_classification;
+    }
+
     await this.eventRepository.save({
       run_id: context.runId,
       step_id: context.stepId,
       kind: EventKind.TOOL_CALL,
-      payload: {
-        tool_id: toolId,
-        input: validatedInput,
-        output,
-        context: logContext,
-      },
+      payload: eventPayload,
     });
 
     return output;

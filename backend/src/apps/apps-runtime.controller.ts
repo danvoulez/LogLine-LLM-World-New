@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +14,7 @@ import { AppAction } from './entities/app-action.entity';
 import { AppWorkflow } from './entities/app-workflow.entity';
 import { OrchestratorService } from '../execution/orchestrator.service';
 import { AppsImportService } from './apps-import.service';
+import { AppScopeCheckerService } from './services/app-scope-checker.service';
 
 interface ExecuteActionDto {
   event?: Record<string, any>;
@@ -25,6 +27,8 @@ interface ExecuteActionDto {
 
 @Controller('apps')
 export class AppsRuntimeController {
+  private readonly logger = new Logger(AppsRuntimeController.name);
+
   constructor(
     @InjectRepository(App)
     private appRepository: Repository<App>,
@@ -34,6 +38,7 @@ export class AppsRuntimeController {
     private appWorkflowRepository: Repository<AppWorkflow>,
     private orchestratorService: OrchestratorService,
     private appsImportService: AppsImportService,
+    private scopeChecker: AppScopeCheckerService,
   ) {}
 
   @Get()
@@ -60,6 +65,44 @@ export class AppsRuntimeController {
     }
 
     return app;
+  }
+
+  @Get(':app_id/actions')
+  async listAppActions(@Param('app_id') appId: string) {
+    const actions = await this.appActionRepository.find({
+      where: { app_id: appId },
+      relations: ['app_workflow', 'app_workflow.workflow'],
+    });
+
+    // Return actions with resolved input_mapping info
+    return actions.map((action) => ({
+      id: action.action_id,
+      label: action.label,
+      workflow_id: action.app_workflow.workflow?.id,
+      workflow_alias: action.app_workflow.alias,
+      input_mapping: action.input_mapping,
+    }));
+  }
+
+  @Get(':app_id/scopes')
+  async getAppScopes(@Param('app_id') appId: string) {
+    const app = await this.appRepository.findOne({
+      where: { id: appId },
+    });
+
+    if (!app) {
+      throw new NotFoundException(`App with ID ${appId} not found`);
+    }
+
+    const scopes = await this.scopeChecker.getAppScopes(appId);
+
+    return {
+      app_id: appId,
+      scopes: scopes.map((scope) => ({
+        type: scope.scope_type,
+        value: scope.scope_value,
+      })),
+    };
   }
 
   @Post(':app_id/actions/:action_id')
@@ -94,10 +137,13 @@ export class AppsRuntimeController {
     }
 
     // Build workflow input from input_mapping
+    // TODO: Add strict mode based on app/workflow configuration
+    const strictMode = false; // Can be enabled per app or workflow
     const workflowInput = this.buildWorkflowInput(
       appAction.input_mapping,
       body.event || {},
       body.context || {},
+      strictMode,
     );
 
     // Start run via orchestrator
@@ -124,8 +170,10 @@ export class AppsRuntimeController {
     inputMapping: Record<string, any>,
     event: Record<string, any>,
     context: Record<string, any>,
+    strictMode: boolean = false,
   ): Record<string, any> {
     const workflowInput: Record<string, any> = {};
+    const unresolvedPaths: string[] = [];
 
     for (const [key, value] of Object.entries(inputMapping)) {
       if (typeof value === 'string' && value.startsWith('$')) {
@@ -133,28 +181,46 @@ export class AppsRuntimeController {
         const path = value.substring(1); // Remove $
         const parts = path.split('.');
 
+        let resolved: any = undefined;
+
         if (parts[0] === 'context') {
           // Resolve from context
-          let resolved = context;
+          resolved = context;
           for (let i = 1; i < parts.length; i++) {
             resolved = resolved?.[parts[i]];
           }
-          workflowInput[key] = resolved;
         } else if (parts[0] === 'event') {
           // Resolve from event
-          let resolved = event;
+          resolved = event;
           for (let i = 1; i < parts.length; i++) {
             resolved = resolved?.[parts[i]];
           }
-          workflowInput[key] = resolved;
         } else {
           // Direct value
-          workflowInput[key] = value;
+          resolved = value;
         }
+
+        // Log warning if path resolves to undefined
+        if (resolved === undefined) {
+          unresolvedPaths.push(`$${path}`);
+          this.logger.warn(
+            `Input mapping path resolved to undefined: $${path} for key ${key}`,
+            { path, key, event, context },
+          );
+        }
+
+        workflowInput[key] = resolved;
       } else {
         // Static value
         workflowInput[key] = value;
       }
+    }
+
+    // In strict mode, throw error if any paths are unresolved
+    if (strictMode && unresolvedPaths.length > 0) {
+      throw new Error(
+        `Input mapping validation failed: The following paths resolved to undefined: ${unresolvedPaths.join(', ')}`,
+      );
     }
 
     return workflowInput;

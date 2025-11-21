@@ -140,22 +140,61 @@ Please generate a SELECT query that answers the question. This is a read-only op
 Generate the SQL query:`,
         });
 
-        const sql = result.text.trim();
+        let sql = result.text.trim();
 
         // Validate it's a SELECT query
         if (!sql.toUpperCase().startsWith('SELECT')) {
           throw new Error('Security: Only SELECT queries are allowed for read operations');
         }
 
-        // Execute SQL
-        const results = await this.dataSource.query(sql);
+        // Add default LIMIT 200 if not present (safety measure)
+        const sqlUpper = sql.toUpperCase();
+        if (!sqlUpper.includes('LIMIT')) {
+          // Check if query ends with semicolon
+          if (sql.trim().endsWith(';')) {
+            sql = sql.trim().slice(0, -1) + ' LIMIT 200;';
+          } else {
+            sql = sql.trim() + ' LIMIT 200';
+          }
+        }
 
-        return {
-          operation: 'read',
-          sql,
-          results,
-          rowCount: results.length,
-        };
+        // Classify query type for observability
+        let queryClassification: 'simple_lookup' | 'reporting' | 'unknown' = 'unknown';
+        if (sqlUpper.includes('COUNT') || sqlUpper.includes('SUM') || sqlUpper.includes('AVG') || sqlUpper.includes('GROUP BY')) {
+          queryClassification = 'reporting';
+        } else if (sqlUpper.includes('WHERE') && !sqlUpper.includes('JOIN')) {
+          queryClassification = 'simple_lookup';
+        }
+
+        // Execute SQL in READ ONLY transaction for security
+        // This prevents any data modification even if SQL contains CTEs or other tricks
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        
+        try {
+          // Start READ ONLY transaction
+          await queryRunner.query('BEGIN TRANSACTION READ ONLY');
+          
+          // Execute query
+          const results = await queryRunner.query(sql);
+          
+          // Always rollback (READ ONLY transactions don't commit changes anyway, but this is extra safety)
+          await queryRunner.rollbackTransaction();
+          
+          return {
+            operation: 'read',
+            sql,
+            results,
+            rowCount: results.length,
+            query_classification: queryClassification,
+          };
+        } catch (error) {
+          // Rollback on error
+          await queryRunner.rollbackTransaction();
+          throw error;
+        } finally {
+          await queryRunner.release();
+        }
       },
     };
   }
@@ -169,6 +208,7 @@ Generate the SQL query:`,
           instruction: string;
           dryRun?: boolean;
           confirm?: boolean;
+          require_human_confirmation?: boolean;
         },
         context: ToolContext,
       ) => {
@@ -182,7 +222,14 @@ Generate the SQL query:`,
         //   throw new Error('Policy denied: Database write access not allowed');
         // }
 
-        const { instruction, dryRun = true, confirm = false } = input;
+        // Validate app scope (write operations should be scoped to specific apps)
+        if (!context.appId) {
+          throw new Error(
+            'Security: Database write operations require explicit app scope. This tool should only be used within an app context.',
+          );
+        }
+
+        const { instruction, dryRun = true, confirm = false, require_human_confirmation = true } = input;
 
         // Generate SQL from natural language - dignified, clear, helpful
         const result = await generateText({
@@ -231,10 +278,26 @@ SQL query:`,
           return {
             operation: 'write',
             requiresConfirmation: true,
+            require_human_confirmation: require_human_confirmation,
             proposedAction: instruction,
             proposedSQL: sql,
             message:
               'Write operation requires explicit confirmation. Set confirm=true to proceed.',
+            app_id: context.appId,
+          };
+        }
+
+        // If require_human_confirmation is true, still require explicit human approval
+        if (require_human_confirmation && !confirm) {
+          return {
+            operation: 'write',
+            requiresConfirmation: true,
+            require_human_confirmation: true,
+            proposedAction: instruction,
+            proposedSQL: sql,
+            message:
+              'This write operation requires human confirmation. Set require_human_confirmation=false or confirm=true to proceed.',
+            app_id: context.appId,
           };
         }
 

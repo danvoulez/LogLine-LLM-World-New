@@ -1,6 +1,15 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateDefaultRouterAgents1700000000002 implements MigrationInterface {
+/**
+ * Migration 0005: Create default router agents
+ * 
+ * Creates default agents required for router nodes and conditional edge evaluation:
+ * - agent.router: For routing decisions in router nodes
+ * - agent.condition_evaluator: For evaluating conditional edges
+ * 
+ * IMPORTANT: This migration must run AFTER 0003 (create-core-tables) and 0004 (seed-builtin-tools)
+ */
+export class CreateDefaultRouterAgents1700000000005 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create default router agent
     await queryRunner.query(`

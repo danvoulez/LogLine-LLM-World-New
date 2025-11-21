@@ -201,15 +201,19 @@ export class OrchestratorService {
     }
 
     // Dynamic execution: execute nodes and determine next node based on output
-    const executedNodes = new Set<string>();
+    // Allow cycles for patterns like Reflection/Retry, but limit total steps to prevent infinite loops
+    const MAX_STEPS = 50; // Maximum steps per run to prevent infinite loops
+    let stepCount = 0;
     let currentNode: string | null = entryNode;
 
     while (currentNode) {
-      // Prevent infinite loops
-      if (executedNodes.has(currentNode)) {
-        throw new Error(`Circular dependency detected: node ${currentNode} already executed`);
+      // Prevent infinite loops by limiting total steps
+      stepCount++;
+      if (stepCount > MAX_STEPS) {
+        throw new Error(
+          `Maximum step limit (${MAX_STEPS}) exceeded. This may indicate an infinite loop or a workflow that needs optimization.`,
+        );
       }
-      executedNodes.add(currentNode);
 
       const node = nodes.find((n) => n.id === currentNode);
       if (!node) {

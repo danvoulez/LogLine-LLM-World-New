@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { App, AppVisibility } from './entities/app.entity';
 import { AppScope, ScopeType } from './entities/app-scope.entity';
 import { AppWorkflow } from './entities/app-workflow.entity';
@@ -52,6 +52,7 @@ export class AppsImportService {
     @InjectRepository(Workflow)
     private workflowRepository: Repository<Workflow>,
     private manifestValidator: AppManifestValidatorService,
+    private dataSource: DataSource,
   ) {}
 
   async importManifest(manifest: AppManifest): Promise<App> {
@@ -84,45 +85,52 @@ export class AppsImportService {
 
     app = await this.appRepository.save(app);
 
-    // Clear existing scopes, workflows, and actions
-    await this.appScopeRepository.delete({ app_id: app.id });
-    await this.appActionRepository.delete({ app_id: app.id });
-    await this.appWorkflowRepository.delete({ app_id: app.id });
+    // Use transaction to prevent race conditions during import
+    // This ensures delete and insert operations are atomic
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // Insert scopes
+    try {
+      // Clear existing scopes, workflows, and actions (within transaction)
+      await queryRunner.manager.delete(AppScope, { app_id: app.id });
+      await queryRunner.manager.delete(AppAction, { app_id: app.id });
+      await queryRunner.manager.delete(AppWorkflow, { app_id: app.id });
+
+      // Insert scopes
     if (appData.scopes) {
       const scopePromises: Promise<AppScope>[] = [];
 
       if (appData.scopes.tools) {
         for (const toolId of appData.scopes.tools) {
-          const scope = this.appScopeRepository.create({
+          const scope = queryRunner.manager.create(AppScope, {
             app_id: app.id,
             scope_type: ScopeType.TOOL,
             scope_value: toolId,
           });
-          scopePromises.push(this.appScopeRepository.save(scope));
+          scopePromises.push(queryRunner.manager.save(scope));
         }
       }
 
       if (appData.scopes.memory) {
         for (const memoryId of appData.scopes.memory) {
-          const scope = this.appScopeRepository.create({
+          const scope = queryRunner.manager.create(AppScope, {
             app_id: app.id,
             scope_type: ScopeType.MEMORY,
             scope_value: memoryId,
           });
-          scopePromises.push(this.appScopeRepository.save(scope));
+          scopePromises.push(queryRunner.manager.save(scope));
         }
       }
 
       if (appData.scopes.external) {
         for (const externalId of appData.scopes.external) {
-          const scope = this.appScopeRepository.create({
+          const scope = queryRunner.manager.create(AppScope, {
             app_id: app.id,
             scope_type: ScopeType.EXTERNAL,
             scope_value: externalId,
           });
-          scopePromises.push(this.appScopeRepository.save(scope));
+          scopePromises.push(queryRunner.manager.save(scope));
         }
       }
 
@@ -145,7 +153,7 @@ export class AppsImportService {
           );
         }
 
-        const appWorkflow = this.appWorkflowRepository.create({
+        const appWorkflow = queryRunner.manager.create(AppWorkflow, {
           app_id: app.id,
           alias: workflowDef.id,
           workflow_id: workflow.id,
@@ -153,7 +161,7 @@ export class AppsImportService {
           default_mode: this.mapRunMode(workflowDef.default_mode),
         });
 
-        const saved = await this.appWorkflowRepository.save(appWorkflow);
+        const saved = await queryRunner.manager.save(appWorkflow);
         workflowMap.set(workflowDef.id, saved);
       }
     }
@@ -169,7 +177,7 @@ export class AppsImportService {
           );
         }
 
-        const appAction = this.appActionRepository.create({
+        const appAction = queryRunner.manager.create(AppAction, {
           app_id: app.id,
           action_id: actionDef.id,
           label: actionDef.label,
@@ -177,8 +185,19 @@ export class AppsImportService {
           input_mapping: actionDef.input_mapping,
         });
 
-        await this.appActionRepository.save(appAction);
+        await queryRunner.manager.save(appAction);
       }
+    }
+
+      // Commit transaction
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      // Rollback on error
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      // Release query runner
+      await queryRunner.release();
     }
 
     // Reload app with relations

@@ -194,21 +194,42 @@ export class AgentRuntimeService {
       this.budgetTracker.addCost(context.runId, estimatedCostCents);
     }
 
-    // Log LLM call as event
+    // Log LLM call as event (with PII protection)
+    const logLlmContent = process.env.LOG_LLM_CONTENT !== 'false'; // Default: true (dev/staging)
+    
+    let eventPayload: any = {
+      agent_id: agentId,
+      model: llmConfig.model,
+      provider: llmConfig.provider,
+      finishReason: result.finishReason,
+      usage: usage,
+      estimated_cost_cents: estimatedCostCents,
+    };
+
+    if (logLlmContent) {
+      // Full logging (dev/staging)
+      eventPayload.prompt = messages;
+      eventPayload.response = result.text;
+    } else {
+      // PII-protected logging (production)
+      // Generate hash of prompt for correlation
+      const crypto = require('crypto');
+      const promptHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(messages))
+        .digest('hex')
+        .substring(0, 16);
+      
+      eventPayload.prompt_hash = promptHash;
+      eventPayload.response_length = result.text?.length || 0;
+      eventPayload.pii_protected = true;
+    }
+
     await this.eventRepository.save({
       run_id: context.runId,
       step_id: context.stepId,
       kind: EventKind.LLM_CALL,
-      payload: {
-        agent_id: agentId,
-        model: llmConfig.model,
-        provider: llmConfig.provider,
-        prompt: messages,
-        response: result.text,
-        finishReason: result.finishReason,
-        usage: usage,
-        estimated_cost_cents: estimatedCostCents,
-      },
+      payload: eventPayload,
     });
 
     // Process tool calls
@@ -315,17 +336,22 @@ export class AgentRuntimeService {
         const run = await this.runRepository.findOne({ where: { id: context.runId } });
         if (run) {
           // Fetch steps and events for atomic context
-          const steps = await this.stepRepository.find({
+          // Get last 20 steps (most recent first, then reverse for chronological order)
+          const recentSteps = await this.stepRepository.find({
             where: { run_id: context.runId },
-            order: { started_at: 'ASC' },
+            order: { started_at: 'DESC' },
             take: 20, // Limit to recent steps
           });
+          const steps = recentSteps.reverse(); // Reverse to maintain chronological order
 
-          const events = await this.eventRepository.find({
+          // Get last 50 events (most recent first, then reverse for chronological order)
+          // Use secondary ordering by id for deterministic ordering
+          const recentEvents = await this.eventRepository.find({
             where: { run_id: context.runId },
-            order: { ts: 'ASC' },
+            order: { ts: 'DESC', id: 'DESC' },
             take: 50, // Limit to recent events
           });
+          const events = recentEvents.reverse(); // Reverse to maintain chronological order
 
           // Build atomic context chain
           const atomicContext = await this.atomicConverter.buildAtomicContextChain(
@@ -442,47 +468,112 @@ This structured format helps you understand:
 Remember: You're working in a collaborative environment. If you need clarification or notice any issues, feel free to mention them. We're here to work together to get the best results.`;
   }
 
-  private jsonSchemaToZod(schema: Record<string, any>): z.ZodObject<any> {
-    // Simple conversion from JSON Schema to Zod
-    // This is a basic implementation - can be enhanced
-    const shape: Record<string, z.ZodTypeAny> = {};
+  /**
+   * Convert JSON Schema to Zod schema (recursive version supporting nested objects and arrays)
+   */
+  private jsonSchemaToZod(schema: Record<string, any>): z.ZodTypeAny {
+    if (!schema || typeof schema !== 'object') {
+      return z.any();
+    }
 
-    if (schema.properties) {
+    // Handle array schemas
+    if (schema.type === 'array') {
+      if (schema.items) {
+        const itemSchema = this.jsonSchemaToZod(schema.items);
+        return z.array(itemSchema);
+      }
+      return z.array(z.any());
+    }
+
+    // Handle object schemas
+    if (schema.type === 'object' || schema.properties) {
+      if (!schema.properties) {
+        return z.object({});
+      }
+
+      const shape: Record<string, z.ZodTypeAny> = {};
+
       for (const [key, prop] of Object.entries(schema.properties)) {
         const propSchema = prop as any;
         let zodType: z.ZodTypeAny;
 
-        switch (propSchema.type) {
-          case 'string':
-            zodType = z.string();
-            break;
-          case 'number':
-            zodType = z.number();
-            break;
-          case 'boolean':
-            zodType = z.boolean();
-            break;
-          case 'array':
+        // Recursively handle nested objects
+        if (propSchema.type === 'object' || propSchema.properties) {
+          zodType = this.jsonSchemaToZod(propSchema);
+        }
+        // Handle arrays with item schemas
+        else if (propSchema.type === 'array') {
+          if (propSchema.items) {
+            const itemSchema = this.jsonSchemaToZod(propSchema.items);
+            zodType = z.array(itemSchema);
+          } else {
             zodType = z.array(z.any());
-            break;
-          case 'object':
-            zodType = z.object({});
-            break;
-          default:
-            zodType = z.any();
+          }
+        }
+        // Handle primitive types
+        else {
+          switch (propSchema.type) {
+            case 'string':
+              if (propSchema.enum) {
+                zodType = z.enum(propSchema.enum as [string, ...string[]]);
+              } else {
+                let stringType = z.string();
+                if (propSchema.minLength !== undefined) {
+                  stringType = stringType.min(propSchema.minLength);
+                }
+                if (propSchema.maxLength !== undefined) {
+                  stringType = stringType.max(propSchema.maxLength);
+                }
+                zodType = stringType;
+              }
+              break;
+            case 'number':
+            case 'integer':
+              let numberType = z.number();
+              if (propSchema.minimum !== undefined) {
+                numberType = numberType.min(propSchema.minimum);
+              }
+              if (propSchema.maximum !== undefined) {
+                numberType = numberType.max(propSchema.maximum);
+              }
+              zodType = numberType;
+              break;
+            case 'boolean':
+              zodType = z.boolean();
+              break;
+            default:
+              zodType = z.any();
+          }
         }
 
         if (propSchema.description) {
           zodType = zodType.describe(propSchema.description);
         }
 
-        shape[key] = propSchema.required
-          ? zodType
-          : zodType.optional();
+        // Check if field is required
+        const isRequired = schema.required?.includes(key) ?? false;
+        if (isRequired) {
+          shape[key] = zodType;
+        } else {
+          shape[key] = zodType.optional();
+        }
       }
+
+      return z.object(shape);
     }
 
-    return z.object(shape);
+    // Handle primitive types at root level
+    switch (schema.type) {
+      case 'string':
+        return z.string();
+      case 'number':
+      case 'integer':
+        return z.number();
+      case 'boolean':
+        return z.boolean();
+      default:
+        return z.any();
+    }
   }
 
   async getAgent(agentId: string): Promise<Agent | null> {
