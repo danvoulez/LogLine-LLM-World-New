@@ -12,9 +12,10 @@ O **Registry Universal** é o coração do LogLineOS - um repositório centraliz
 
 1. **Apps** - Aplicações (marketplace público)
 2. **Pessoas** - Identidades universais (LogLine ID)
-3. **Contratos** - Acordos executáveis (máquina de estados)
-4. **Ideias** - Democracia orçamentária (votação colaborativa)
-5. **Objetos** - Matéria inanimada rastreável (documentos, mercadorias, estoque, etc.)
+3. **Agentes** - Agentes LLM com identidade, memória, onboarding e contratos
+4. **Contratos** - Acordos executáveis (máquina de estados)
+5. **Ideias** - Democracia orçamentária (votação colaborativa)
+6. **Objetos** - Matéria inanimada rastreável (documentos, mercadorias, estoque, etc.)
 
 **Princípios:**
 - ✅ **Multitenant** - Isolamento por tenant quando necessário
@@ -388,7 +389,315 @@ POST /registry/ideas/{id}/approve
 
 ---
 
-## 📄 4. CONTRATOS - Acordos Executáveis
+## 🤖 4. AGENTES - Identidade, Dignidade e Responsabilidade
+
+### 4.1. Conceito
+
+**Filosofia:** Agentes LLM são entidades com **identidade própria**, **memória persistente**, **onboarding/treinamento** e podem operar **sob contrato** para garantir limites e escopo.
+
+**Princípios:**
+- ✅ **Identidade Universal**: Agentes têm LogLine Agent ID (similar a Pessoas)
+- ✅ **Memória Própria**: Cada agente tem sua memória isolada (owner_type='agent')
+- ✅ **Onboarding/Treinamento**: Agentes podem ser treinados de forma geral ou personalizada
+- ✅ **Responsabilidade**: Agentes podem funcionar sob contrato
+- ✅ **Limites e Escopo**: Contratos definem o que o agente pode/não pode fazer
+
+### 4.2. Schema
+
+```sql
+-- Agentes no Registry Universal
+CREATE TABLE registry_agents (
+  id              VARCHAR(255) PRIMARY KEY, -- 'agent.ticket_triage' (mantém compatibilidade)
+  logline_agent_id VARCHAR(50) UNIQUE, -- 'LL-AGENT-2024-000123456' (identidade universal)
+  tenant_id       UUID, -- NULL = agente público/compartilhado
+  app_id          VARCHAR(255), -- App que criou (opcional)
+  
+  -- Identidade
+  name            TEXT NOT NULL,
+  description     TEXT,
+  avatar_url      TEXT, -- Para UI
+  
+  -- Configuração LLM
+  instructions    TEXT NOT NULL, -- System prompt/instructions
+  model_profile   JSONB NOT NULL, -- {provider, model, temperature, max_tokens}
+  allowed_tools   TEXT[] NOT NULL DEFAULT '{}',
+  
+  -- Onboarding e Treinamento
+  onboarding_status TEXT NOT NULL DEFAULT 'pending',
+  -- 'pending' | 'in_training' | 'trained' | 'certified' | 'suspended'
+  training_type   TEXT, -- 'general' | 'personalized' | 'custom'
+  training_data   JSONB, -- Dados de treinamento específicos
+  training_completed_at TIMESTAMPTZ,
+  certified_by_logline_id VARCHAR(50) REFERENCES core_people(logline_id),
+  
+  -- Memória
+  memory_enabled  BOOLEAN DEFAULT true,
+  memory_scope    TEXT DEFAULT 'private', -- 'private' | 'tenant' | 'org' | 'public'
+  
+  -- Contrato Ativo
+  active_contract_id UUID REFERENCES registry_contracts(id),
+  contract_scope   JSONB, -- Limites e escopo definidos no contrato
+  -- {
+  --   "allowed_tools": ["tool1", "tool2"],
+  --   "max_cost_per_run_cents": 1000,
+  --   "max_llm_calls_per_run": 50,
+  --   "allowed_workflows": ["workflow1"],
+  --   "restricted_actions": ["delete", "update_sensitive"]
+  -- }
+  
+  -- Responsabilidade e Auditoria
+  created_by_logline_id VARCHAR(50) REFERENCES core_people(logline_id),
+  owner_logline_id VARCHAR(50) REFERENCES core_people(logline_id), -- Responsável pelo agente
+  accountability_enabled BOOLEAN DEFAULT true,
+  
+  -- Métricas de Performance
+  total_runs       INTEGER DEFAULT 0,
+  successful_runs  INTEGER DEFAULT 0,
+  failed_runs      INTEGER DEFAULT 0,
+  avg_cost_per_run_cents DECIMAL(12,2),
+  reputation_score DECIMAL(3,2), -- 0.00 a 5.00 (baseado em avaliações)
+  
+  -- Visibilidade
+  visibility       TEXT NOT NULL DEFAULT 'tenant', -- 'tenant' | 'org' | 'public'
+  
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_registry_agents_logline_id ON registry_agents(logline_agent_id);
+CREATE INDEX idx_registry_agents_tenant ON registry_agents(tenant_id);
+CREATE INDEX idx_registry_agents_owner ON registry_agents(owner_logline_id);
+CREATE INDEX idx_registry_agents_contract ON registry_agents(active_contract_id);
+CREATE INDEX idx_registry_agents_onboarding ON registry_agents(onboarding_status);
+
+-- Histórico de Treinamento
+CREATE TABLE registry_agent_training_history (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id        VARCHAR(255) NOT NULL REFERENCES registry_agents(id),
+  training_type   TEXT NOT NULL, -- 'general' | 'personalized' | 'custom'
+  training_data   JSONB, -- Dados usados no treinamento
+  trained_by_logline_id VARCHAR(50) REFERENCES core_people(logline_id),
+  result          TEXT, -- 'success' | 'failed' | 'partial'
+  performance_metrics JSONB, -- Métricas antes/depois do treinamento
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_agent_training_agent ON registry_agent_training_history(agent_id);
+
+-- Avaliações de Agentes (para reputação)
+CREATE TABLE registry_agent_evaluations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id        VARCHAR(255) NOT NULL REFERENCES registry_agents(id),
+  evaluator_logline_id VARCHAR(50) NOT NULL REFERENCES core_people(logline_id),
+  run_id          UUID, -- Run que foi avaliado (opcional)
+  rating          INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  evaluation      TEXT, -- Feedback detalhado
+  criteria        JSONB, -- { accuracy: 5, speed: 4, cost_efficiency: 3 }
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_agent_evaluations_agent ON registry_agent_evaluations(agent_id);
+CREATE INDEX idx_agent_evaluations_evaluator ON registry_agent_evaluations(evaluator_logline_id);
+```
+
+### 4.3. Onboarding e Treinamento
+
+#### Tipos de Treinamento
+
+**1. Treinamento Geral:**
+- Baseado em dataset público
+- Certificação padrão do sistema
+- Status: `certified` (aprovado pelo sistema)
+
+**2. Treinamento Personalizado:**
+- Baseado em dados específicos do tenant/app
+- Treinamento customizado para casos de uso específicos
+- Status: `trained` (aprovado pelo responsável)
+
+**3. Treinamento Custom:**
+- Dataset completamente customizado
+- Instruções específicas
+- Status: `trained` (aprovado pelo responsável)
+
+#### Fluxo de Onboarding
+
+```
+1. CRIAÇÃO
+   → Agente criado com status 'pending'
+   → Instruções básicas definidas
+   
+2. TREINAMENTO
+   → Escolhe tipo de treinamento
+   → Sistema executa treinamento
+   → Status: 'in_training'
+   
+3. AVALIAÇÃO
+   → Testes de performance
+   → Validação de comportamento
+   → Status: 'trained' ou 'certified'
+   
+4. ATIVAÇÃO
+   → Agente pode ser usado em workflows
+   → Pode receber contrato
+   → Status: 'active'
+```
+
+### 4.4. Agentes sob Contrato
+
+**Conceito:** Agentes podem operar sob contrato para garantir:
+- **Limites de Escopo**: Quais tools podem usar
+- **Limites de Custo**: Custo máximo por run
+- **Limites de Ações**: O que podem/não podem fazer
+- **Responsabilidade**: Quem é responsável pelo agente
+
+**Exemplo de Contrato com Agente:**
+
+```json
+{
+  "tipo": "prestacao_servico",
+  "titulo": "Agente de Atendimento ao Cliente",
+  "autor_logline_id": "LL-BR-2024-EMPRESA",
+  "contraparte_logline_id": "LL-AGENT-2024-000123456", // Agente!
+  "conteudo": {
+    "escopo": [
+      "Responder perguntas de clientes",
+      "Triar tickets de suporte",
+      "Escalar casos complexos"
+    ],
+    "restricoes": [
+      "Não pode deletar dados",
+      "Não pode acessar dados financeiros",
+      "Custo máximo: R$ 0,50 por atendimento"
+    ]
+  },
+  "contract_scope": {
+    "allowed_tools": ["natural_language_db_read", "memory.search"],
+    "max_cost_per_run_cents": 50,
+    "max_llm_calls_per_run": 3,
+    "restricted_actions": ["delete", "update_sensitive", "financial_access"]
+  }
+}
+```
+
+**Enforcement:**
+- Policy Engine verifica `contract_scope` antes de cada execução
+- Se agente tentar usar tool não permitida → bloqueado
+- Se custo exceder limite → run interrompido
+- Auditoria completa de todas as ações
+
+### 4.5. Memória do Agente
+
+Agentes têm memória própria (já implementado):
+- `owner_type='agent'` em `memory_items`
+- Memória isolada por agente
+- Pode ser `private`, `tenant`, `org`, ou `public`
+- RAG habilitado para contexto histórico
+
+### 4.6. APIs
+
+```http
+POST /registry/agents
+Content-Type: application/json
+
+{
+  "id": "agent.ticket_triage",
+  "name": "Ticket Triage Agent",
+  "description": "Agente especializado em triagem de tickets",
+  "instructions": "You are a helpful support agent...",
+  "model_profile": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  },
+  "allowed_tools": ["natural_language_db_read", "memory.search"],
+  "tenant_id": "tenant-abc",
+  "owner_logline_id": "LL-BR-2024-ADMIN",
+  "training_type": "personalized",
+  "memory_enabled": true,
+  "memory_scope": "tenant"
+}
+```
+
+**Resposta:**
+```json
+{
+  "id": "agent.ticket_triage",
+  "logline_agent_id": "LL-AGENT-2024-000123456",
+  "onboarding_status": "pending",
+  "created_at": "2024-12-19T10:00:00Z"
+}
+```
+
+```http
+POST /registry/agents/{id}/train
+Content-Type: application/json
+
+{
+  "training_type": "personalized",
+  "training_data": {
+    "dataset": ["example1", "example2"],
+    "instructions_additional": "Focus on customer satisfaction"
+  }
+}
+```
+
+```http
+POST /registry/agents/{id}/certify
+Content-Type: application/json
+
+{
+  "certified_by_logline_id": "LL-BR-2024-ADMIN",
+  "certification_level": "standard" // 'standard' | 'advanced' | 'expert'
+}
+```
+
+```http
+POST /registry/agents/{id}/contract
+Content-Type: application/json
+
+{
+  "contract_id": "contract-uuid",
+  "scope": {
+    "allowed_tools": ["tool1", "tool2"],
+    "max_cost_per_run_cents": 1000,
+    "restricted_actions": ["delete"]
+  }
+}
+```
+
+```http
+GET /registry/agents/{id}
+```
+
+```http
+GET /registry/agents?tenant_id=...&onboarding_status=trained&visibility=public
+```
+
+```http
+POST /registry/agents/{id}/evaluate
+Content-Type: application/json
+
+{
+  "rating": 5,
+  "evaluation": "Excellent agent, very helpful",
+  "criteria": {
+    "accuracy": 5,
+    "speed": 4,
+    "cost_efficiency": 3
+  },
+  "run_id": "run-uuid" // opcional
+}
+```
+
+```http
+GET /registry/agents/{id}/memory
+// Retorna memórias do agente (via Memory Service)
+```
+
+---
+
+## 📄 5. CONTRATOS - Acordos Executáveis
 
 ### 4.1. Conceito
 
@@ -567,11 +876,11 @@ Content-Type: application/json
 -- Relacionamentos genéricos entre entidades do Registry
 CREATE TABLE registry_relationships (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_type     TEXT NOT NULL, -- 'person' | 'object' | 'idea' | 'contract' | 'app'
+  source_type     TEXT NOT NULL, -- 'person' | 'agent' | 'object' | 'idea' | 'contract' | 'app'
   source_id       UUID NOT NULL,
   target_type     TEXT NOT NULL,
   target_id       UUID NOT NULL,
-  relationship_type TEXT NOT NULL, -- 'owns' | 'created' | 'references' | 'depends_on' | 'transforms_to'
+  relationship_type TEXT NOT NULL, -- 'owns' | 'created' | 'references' | 'depends_on' | 'transforms_to' | 'works_under' | 'trained_by'
   metadata        JSONB,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -585,6 +894,10 @@ CREATE INDEX idx_relationships_type ON registry_relationships(relationship_type)
 
 ```
 Pessoa → Objeto: "owns" (Maria possui Notebook)
+Pessoa → Agente: "created" (João criou o agente)
+Pessoa → Agente: "trained_by" (Maria treinou o agente)
+Agente → Contrato: "works_under" (Agente trabalha sob contrato)
+Agente → Objeto: "created" (Agente criou documento)
 Ideia → Contrato: "transforms_to" (Ideia aprovada vira Contrato)
 Contrato → Objeto: "generates" (Contrato concluído gera Objeto no estoque)
 Objeto → Pessoa: "transferred_to" (Objeto transferido para Pessoa)
@@ -597,7 +910,7 @@ Objeto → Pessoa: "transferred_to" (Objeto transferido para Pessoa)
 ### 6.1. Discovery Unificado
 
 ```http
-GET /registry/search?type=person|object|idea|contract|app&q=...&tenant_id=...
+GET /registry/search?type=person|agent|object|idea|contract|app&q=...&tenant_id=...
 ```
 
 ### 6.2. Cross-References
@@ -677,9 +990,10 @@ Apps devem declarar permissões no manifest:
 ## 🚀 9. IMPLEMENTAÇÃO
 
 ### Phase 5.1: Registry Core (Pessoas + Objetos)
-### Phase 5.2: Registry Ideias + Contratos
-### Phase 5.3: Registry Apps (Marketplace)
-### Phase 5.4: Relacionamentos e Workflows
+### Phase 5.2: Registry Agentes (Identidade, Memória, Onboarding, Contratos)
+### Phase 5.3: Registry Ideias + Contratos
+### Phase 5.4: Registry Apps (Marketplace)
+### Phase 5.5: Relacionamentos e Workflows
 
 ---
 

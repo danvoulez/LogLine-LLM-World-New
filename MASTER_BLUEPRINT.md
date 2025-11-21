@@ -1727,6 +1727,14 @@ O Registry Universal é o coração do LogLineOS - um repositório centralizado 
 - **Fluxo**: Submissão → Votação → Análise → Decisão → Execução → Retrospectiva
 - **APIs**: `POST /registry/ideas`, `POST /registry/ideas/{id}/vote`, `GET /registry/ideas/{id}/matrix`
 
+#### 5.3. Agentes - Identidade, Dignidade e Responsabilidade
+- **LogLine Agent ID**: `LL-AGENT-2024-000123456` (identidade universal)
+- **Memória própria**: Cada agente tem memória isolada (owner_type='agent')
+- **Onboarding/Treinamento**: Geral, personalizado ou custom (com certificação)
+- **Agentes sob contrato**: Contratos definem limites, escopo e responsabilidade
+- **Enforcement**: Policy Engine verifica `contract_scope` antes de cada execução
+- **APIs**: `POST /registry/agents`, `POST /registry/agents/{id}/train`, `POST /registry/agents/{id}/contract`
+
 #### 5.4. Contratos - Acordos Executáveis
 - **Máquina de estados**: RASCUNHO → VIGENTE → QUESTIONADO / CONCLUÍDO / CANCELADO → PENALIZADO
 - **Questionamento automático**: Prazo expirado → Período de defesa → Resolução
