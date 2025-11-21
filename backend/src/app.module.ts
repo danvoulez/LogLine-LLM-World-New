@@ -27,10 +27,22 @@ import { FilesModule } from './files/files.module';
 import { TdlnTModule } from './tdln-t/tdln-t.module';
 import { MemoryModule } from './memory/memory.module';
 import { PoliciesModule } from './policies/policies.module';
+import { AuthModule } from './auth/auth.module';
+import { AuditModule } from './audit/audit.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { RateLimitingModule } from './rate-limiting/rate-limiting.module';
+import { CronModule } from './cron/cron.module';
 import { File } from './files/entities/file.entity';
 import { MemoryItem } from './memory/entities/memory-item.entity';
 import { Resource } from './memory/entities/resource.entity';
 import { Policy } from './policies/entities/policy.entity';
+import { User } from './auth/entities/user.entity';
+import { Session } from './auth/entities/session.entity';
+import { ApiKey } from './auth/entities/api-key.entity';
+import { AuditLog } from './audit/entities/audit-log.entity';
+import { AlertConfig } from './alerts/entities/alert-config.entity';
+import { AlertHistory } from './alerts/entities/alert-history.entity';
 import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
@@ -42,7 +54,7 @@ function getDatabaseConfig() {
     return {
       type: 'postgres' as const,
       url: process.env.POSTGRES_URL,
-      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File, MemoryItem, Resource, Policy],
+      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File, MemoryItem, Resource, Policy, User, Session, ApiKey, AuditLog, AlertConfig, AlertHistory],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
       // Vercel Postgres requires SSL in production
@@ -109,6 +121,12 @@ function getDatabaseConfig() {
           TdlnTModule, // TDLN-T deterministic translation
           MemoryModule,
     PoliciesModule, // Memory & RAG engine
+    AuthModule, // Authentication & RBAC
+    AuditModule, // Audit logging
+    MetricsModule, // Metrics & monitoring
+    AlertsModule, // Alerts system
+    RateLimitingModule, // Enhanced rate limiting
+    CronModule, // Scheduled tasks
         ],
   controllers: [AppController, DatabaseController],
   providers: [

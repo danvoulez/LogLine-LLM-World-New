@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,12 +16,15 @@ import { AppWorkflow } from './entities/app-workflow.entity';
 import { OrchestratorService } from '../execution/orchestrator.service';
 import { AppsImportService } from './apps-import.service';
 import { AppScopeCheckerService } from './services/app-scope-checker.service';
+import { PolicyEngineV1Service } from '../policies/policy-engine-v1.service';
+import { ForbiddenException } from '@nestjs/common';
 
 interface ExecuteActionDto {
   event?: Record<string, any>;
   context?: {
     user_id?: string;
     tenant_id?: string;
+    mode?: 'draft' | 'auto'; // Allow override of default_mode
     [key: string]: any;
   };
 }
@@ -39,6 +43,7 @@ export class AppsRuntimeController {
     private orchestratorService: OrchestratorService,
     private appsImportService: AppsImportService,
     private scopeChecker: AppScopeCheckerService,
+    private policyEngineV1: PolicyEngineV1Service,
   ) {}
 
   @Get()
@@ -146,15 +151,53 @@ export class AppsRuntimeController {
       strictMode,
     );
 
+    // Determine mode: use context override if provided, otherwise use app workflow default_mode
+    const mode = body.context?.mode || appWorkflow.default_mode;
+
+    // Validate mode override (if provided, must be valid)
+    if (body.context?.mode && !['draft', 'auto'].includes(body.context.mode)) {
+      throw new BadRequestException(
+        `Invalid mode: ${body.context.mode}. Mode must be 'draft' or 'auto'`,
+      );
+    }
+
+    // Policy check for run start
+    const policyDecision = await this.policyEngineV1.checkRunStart(workflow.id, {
+      appId,
+      userId: body.context?.user_id,
+      tenantId: body.context?.tenant_id || 'default-tenant',
+      mode,
+      input: workflowInput,
+    });
+
+    if (!policyDecision.allowed) {
+      if (policyDecision.requiresApproval) {
+        throw new BadRequestException(
+          `Run requires approval: ${policyDecision.reason || 'Policy requires human approval'}`,
+        );
+      }
+      throw new ForbiddenException(
+        `Policy denied starting run for app ${appId}, action ${actionId}: ${policyDecision.reason || 'Run not allowed'}`,
+      );
+    }
+
+    // Apply policy modifications (e.g., mode override, input modifications)
+    const finalMode = policyDecision.modifiedContext?.mode_override || mode;
+    const finalInput = {
+      ...workflowInput,
+      ...(policyDecision.modifiedContext?.input_modifications || {}),
+    };
+
     // Start run via orchestrator
     const run = await this.orchestratorService.startRun(
       workflow.id,
-      workflowInput,
-      appWorkflow.default_mode,
+      finalInput,
+      finalMode,
       body.context?.tenant_id || 'default-tenant',
       body.context?.user_id,
       appId,
       actionId,
+      policyDecision.modifiedContext, // Pass modified context from policy
     );
 
     return {

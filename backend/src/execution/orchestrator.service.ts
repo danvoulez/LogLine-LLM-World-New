@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Workflow } from '../workflows/entities/workflow.entity';
@@ -11,6 +11,7 @@ import { AtomicEventConverterService } from '../agents/atomic-event-converter.se
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
 import { BudgetTrackerService } from './budget-tracker.service';
 import { ScopeDeniedException } from '../common/exceptions/scope-denied.exception';
+import { PolicyEngineV1Service } from '../policies/policy-engine-v1.service';
 
 @Injectable()
 export class OrchestratorService {
@@ -30,6 +31,7 @@ export class OrchestratorService {
     private contextSummarizer: ContextSummarizerService,
     private atomicConverter: AtomicEventConverterService,
     private budgetTracker: BudgetTrackerService,
+    private policyEngineV1: PolicyEngineV1Service,
   ) {}
 
   async startRun(
@@ -40,6 +42,7 @@ export class OrchestratorService {
     userId?: string,
     appId?: string,
     appActionId?: string,
+    policyContext?: Record<string, any>, // Optional: pre-evaluated policy context with modifications
   ): Promise<Run> {
     // Load workflow
     const workflow = await this.workflowRepository.findOne({
@@ -48,6 +51,70 @@ export class OrchestratorService {
 
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${workflowId} not found`);
+    }
+
+    // Apply policy modifications if any (from pre-evaluated policy context)
+    let finalInput = { ...input, ...(policyContext?.input_modifications || {}) };
+    let finalMode = policyContext?.mode_override || mode;
+
+    // Policy check: Only if not already evaluated (policyContext not provided)
+    if (!policyContext) {
+      try {
+        const policyDecision = await this.policyEngineV1.checkRunStart(workflowId, {
+          appId,
+          userId,
+          tenantId,
+          mode,
+          input: finalInput,
+        });
+
+        if (!policyDecision.allowed) {
+          this.logger.warn(
+            `Policy denied run start: workflow ${workflowId} with mode ${mode}`,
+            {
+              workflowId,
+              mode,
+              appId,
+              userId,
+              tenantId,
+              reason: policyDecision.reason,
+            },
+          );
+
+          if (policyDecision.requiresApproval) {
+            throw new BadRequestException(
+              `Run requires approval: ${policyDecision.reason || 'Policy requires human approval'}`,
+            );
+          }
+
+          throw new BadRequestException(
+            `Policy denied run start: ${policyDecision.reason || 'Run not allowed'}`,
+          );
+        }
+
+        // Apply any modifications from policy (e.g., force mode to draft)
+        if (policyDecision.modifiedContext) {
+          if (policyDecision.modifiedContext.mode_override) {
+            finalMode = policyDecision.modifiedContext.mode_override as 'draft' | 'auto';
+            this.logger.log(
+              `Policy modified run mode to: ${finalMode}`,
+              { workflowId, originalMode: mode, modifiedMode: policyDecision.modifiedContext.mode_override },
+            );
+          }
+          if (policyDecision.modifiedContext.input_modifications) {
+            Object.assign(finalInput, policyDecision.modifiedContext.input_modifications);
+          }
+        }
+      } catch (error: any) {
+        // If policy engine fails (e.g., no policies table yet), log and continue
+        if (error instanceof BadRequestException) {
+          throw error; // Re-throw policy denials
+        }
+        this.logger.warn(
+          `Policy check failed, continuing without policy enforcement: ${error.message}`,
+          { workflowId, mode },
+        );
+      }
     }
 
     // Create run
@@ -59,12 +126,12 @@ export class OrchestratorService {
       user_id: userId || null,
       tenant_id: tenantId,
       status: RunStatus.PENDING,
-      mode: mode as any,
-      input,
+      mode: finalMode as any,
+      input: finalInput,
       // Budget fields can be set via input or defaults
-      cost_limit_cents: input.cost_limit_cents || null,
-      llm_calls_limit: input.llm_calls_limit || null,
-      latency_slo_ms: input.latency_slo_ms || null,
+      cost_limit_cents: finalInput.cost_limit_cents || null,
+      llm_calls_limit: finalInput.llm_calls_limit || null,
+      latency_slo_ms: finalInput.latency_slo_ms || null,
     });
 
     const savedRun = await this.runRepository.save(run);
@@ -76,7 +143,7 @@ export class OrchestratorService {
     await this.eventRepository.save({
       run_id: savedRun.id,
       kind: EventKind.RUN_STARTED,
-      payload: { workflow_id: workflowId, input },
+      payload: { workflow_id: workflowId, input: finalInput, mode: finalMode },
     });
 
     // Execute workflow asynchronously (non-blocking)

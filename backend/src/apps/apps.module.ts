@@ -11,6 +11,7 @@ import { AppManifestValidatorService } from './validators/app-manifest-validator
 import { RunsModule } from '../runs/runs.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { ToolsModule } from '../tools/tools.module';
+import { PoliciesModule } from '../policies/policies.module';
 import { Workflow } from '../workflows/entities/workflow.entity';
 import { Tool } from '../tools/entities/tool.entity';
 
@@ -20,6 +21,7 @@ import { Tool } from '../tools/entities/tool.entity';
     RunsModule,
     WorkflowsModule,
     ToolsModule,
+    PoliciesModule,
   ],
   controllers: [AppsRuntimeController],
   providers: [

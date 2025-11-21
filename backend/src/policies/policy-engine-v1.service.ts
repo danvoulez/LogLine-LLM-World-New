@@ -166,6 +166,7 @@ export class PolicyEngineV1Service {
       userId?: string;
       tenantId: string;
       mode?: 'draft' | 'auto';
+      input?: Record<string, any>;
     },
   ): Promise<PolicyDecision> {
     const evaluationContext: PolicyEvaluationContext = {
@@ -175,6 +176,7 @@ export class PolicyEngineV1Service {
       action: 'run_start',
       workflowId,
       mode: context.mode || 'draft',
+      input: context.input,
     };
 
     return this.evaluatePolicies(evaluationContext);
