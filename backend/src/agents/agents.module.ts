@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Agent } from './entities/agent.entity';
 import { AgentRuntimeService } from './agent-runtime.service';
@@ -18,6 +18,7 @@ import { AgentInputValidatorService } from '../common/validators/agent-input-val
 import { AtomicValidatorService } from './validators/atomic-validator.service';
 import { RunsModule } from '../runs/runs.module';
 import { PoliciesModule } from '../policies/policies.module';
+import { RegistryModule } from '../registry/registry.module';
 
 @Module({
   imports: [
@@ -26,8 +27,9 @@ import { PoliciesModule } from '../policies/policies.module';
     LlmModule,
     TdlnTModule,
     MemoryModule, // Memory & RAG for agent context
-    RunsModule, // Import to access BudgetTrackerService
+    forwardRef(() => RunsModule), // Import to access BudgetTrackerService
     PoliciesModule, // Import to access PolicyEngineV1Service
+    RegistryModule, // Import to access ContractsService
   ],
   controllers: [AgentsController],
   providers: [

@@ -21,16 +21,16 @@ export class App {
   @PrimaryColumn('varchar')
   id: string; // Custom ID from manifest (e.g., 'coding-agent-frontend')
 
-  @Column()
+  @Column('text')
   name: string;
 
-  @Column({ nullable: true })
+  @Column('text', { nullable: true })
   icon: string | null;
 
   @Column('text', { nullable: true })
   description: string | null;
 
-  @Column({ nullable: true })
+  @Column('text', { nullable: true })
   owner: string | null;
 
   @Column({
@@ -58,4 +58,3 @@ export class App {
   @OneToMany(() => AppAction, (action) => action.app)
   actions: AppAction[];
 }
-

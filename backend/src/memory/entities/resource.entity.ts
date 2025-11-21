@@ -40,4 +40,3 @@ export class Resource {
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 }
-

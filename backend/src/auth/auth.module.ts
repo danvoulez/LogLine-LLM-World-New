@@ -10,6 +10,7 @@ import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
 import { ApiKey } from './entities/api-key.entity';
 import { AuditModule } from '../audit/audit.module';
+import { RegistryModule } from '../registry/registry.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AuditModule } from '../audit/audit.module';
       },
     }),
     forwardRef(() => AuditModule), // Forward ref to avoid circular dependency
+    RegistryModule, // Import RegistryModule to use PeopleService
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, RbacService],

@@ -10,9 +10,13 @@ import { Run } from '../runs/entities/run.entity';
 import { Event } from '../runs/entities/event.entity';
 import { Agent } from '../agents/entities/agent.entity';
 import { App } from '../apps/entities/app.entity';
+import { RegistryModule } from '../registry/registry.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Policy, Tool, Run, Event, Agent, App])],
+  imports: [
+    TypeOrmModule.forFeature([Policy, Tool, Run, Event, Agent, App]),
+    RegistryModule, // Import RegistryModule to check object ownership
+  ],
   controllers: [PoliciesController],
   providers: [PolicyEngineV0Service, PolicyEngineV1Service, PoliciesService],
   exports: [PolicyEngineV0Service, PolicyEngineV1Service, PoliciesService],

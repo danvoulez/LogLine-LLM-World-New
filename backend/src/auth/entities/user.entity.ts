@@ -37,6 +37,9 @@ export class User {
   @Column({ type: 'jsonb', nullable: true })
   metadata?: Record<string, any>;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  logline_id?: string; // Link to Registry Core Person
+
   @CreateDateColumn({ type: 'timestamptz' })
   created_at: Date;
 

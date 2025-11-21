@@ -15,6 +15,11 @@ import { PolicyEngineV1Service } from '../policies/policy-engine-v1.service';
 import { RetryUtil } from '../common/utils/retry.util';
 import { sanitizeForLogging } from '../common/utils/sanitize.util';
 import { MemoryTool } from './memory.tool';
+import { RegistryTool } from '../registry/registry.tool';
+import { HttpTool } from './standard/http.tool';
+import { GithubTool } from './standard/github.tool';
+import { MathTool } from './standard/math.tool';
+import * as crypto from 'crypto';
 
 export interface ToolContext {
   runId: string;
@@ -23,6 +28,16 @@ export interface ToolContext {
   userId?: string;
   tenantId: string;
 }
+
+export type ToolDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  input_schema: Record<string, any>;
+  handler: ToolHandler;
+  risk_level: 'low' | 'medium' | 'high';
+  side_effects: string[];
+};
 
 export type ToolHandler = (input: any, ctx: ToolContext) => Promise<any>;
 
@@ -38,10 +53,14 @@ export class ToolRuntimeService {
     private eventRepository: Repository<Event>,
     private naturalLanguageDbTool: NaturalLanguageDbTool,
     private memoryTool: MemoryTool,
+    private registryTool: RegistryTool,
     private schemaValidator: SchemaValidatorService,
     private scopeChecker: AppScopeCheckerService,
     private policyEngineV0: PolicyEngineV0Service,
     private policyEngineV1: PolicyEngineV1Service,
+    private httpTool: HttpTool,
+    private githubTool: GithubTool,
+    private mathTool: MathTool,
   ) {
     this.registerBuiltinTools();
   }
@@ -58,6 +77,11 @@ export class ToolRuntimeService {
       return tool.execute(input, ctx);
     });
 
+    // Register standard library tools
+    this.toolHandlers.set(this.httpTool.getDefinition().id, this.httpTool.handler);
+    this.toolHandlers.set(this.githubTool.getDefinition().id, this.githubTool.handler);
+    this.toolHandlers.set(this.mathTool.getDefinition().id, this.mathTool.handler);
+
     // Example: ticketing tool (placeholder)
     this.toolHandlers.set('ticketing.list_open', async (input, ctx) => {
       // TODO: Real integration later
@@ -72,6 +96,14 @@ export class ToolRuntimeService {
     // Register memory tools
     const memoryTools = this.memoryTool.getAllTools();
     for (const tool of memoryTools) {
+      this.toolHandlers.set(tool.id, async (input, ctx) => {
+        return tool.handler(input, ctx);
+      });
+    }
+
+    // Register registry tools
+    const registryTools = this.registryTool.getAllTools();
+    for (const tool of registryTools) {
       this.toolHandlers.set(tool.id, async (input, ctx) => {
         return tool.handler(input, ctx);
       });
@@ -270,6 +302,17 @@ export class ToolRuntimeService {
       }
     }
 
+    // Handle remote execution
+    if (tool.handler_type === 'remote' && tool.handler_config) {
+      try {
+        return await this.callRemoteTool(tool, validatedInput, context);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Remote tool error';
+        this.logger.error(`Remote tool execution failed: ${toolId}`, errorMessage, logContext);
+        throw new ToolExecutionException(toolId, errorMessage, error as Error, logContext);
+      }
+    }
+
     // Get handler
     const handler = this.toolHandlers.get(toolId);
     if (!handler) {
@@ -384,6 +427,57 @@ export class ToolRuntimeService {
     return output;
   }
 
+  private async callRemoteTool(tool: Tool, input: any, context: ToolContext): Promise<any> {
+    const { url, secret_env } = tool.handler_config;
+    if (!url) {
+      throw new Error(`Remote tool ${tool.id} missing URL in config`);
+    }
+
+    // Get secret from environment (if configured)
+    const secret = secret_env ? process.env[secret_env] : undefined;
+    const timestamp = Date.now().toString();
+    
+    const payload = {
+      tool_id: tool.id,
+      input,
+      context,
+    };
+
+    // We send the payload as JSON body
+    // The backend logic must match the executor auth middleware
+    // Executor expects JSON stringified body to match signature
+    const bodyString = JSON.stringify(payload);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-LogLine-Tool-Id': tool.id,
+      'X-LogLine-Timestamp': timestamp,
+    };
+
+    // Sign payload if secret is available
+    if (secret) {
+      const signature = crypto
+        .createHmac('sha256', secret)
+        .update(bodyString)
+        .digest('hex');
+      headers['X-LogLine-Signature'] = signature;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: bodyString,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Remote tool execution failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  }
+
   registerTool(toolId: string, handler: ToolHandler) {
     this.toolHandlers.set(toolId, handler);
   }
@@ -424,4 +518,3 @@ export class ToolRuntimeService {
     }
   }
 }
-

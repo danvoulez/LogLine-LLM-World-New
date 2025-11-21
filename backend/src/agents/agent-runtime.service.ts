@@ -17,6 +17,8 @@ import { AgentInputValidatorService } from '../common/validators/agent-input-val
 import { BudgetTrackerService } from '../execution/budget-tracker.service';
 import { MemoryService } from '../memory/memory.service';
 import { PolicyEngineV1Service } from '../policies/policy-engine-v1.service';
+import { ContractsService } from '../registry/contracts/contracts.service';
+import { RegistryContract } from '../registry/contracts/entities/registry-contract.entity';
 import { ScopeDeniedException } from '../common/exceptions/scope-denied.exception';
 import { tool } from 'ai';
 import { z } from 'zod';
@@ -62,6 +64,7 @@ export class AgentRuntimeService {
     private budgetTracker: BudgetTrackerService,
     private memoryService: MemoryService,
     private policyEngineV1: PolicyEngineV1Service,
+    private contractsService: ContractsService,
   ) {}
 
   async runAgentStep(
@@ -105,7 +108,7 @@ export class AgentRuntimeService {
         this.logger.warn(
           `Deterministic task handling failed for agent ${agentId}, falling back to LLM | Error: ${errorName}: ${errorMessage}`,
           {
-            agent_id: agent.id,
+            agent_id: agentId,
             run_id: context.runId,
             step_id: context.stepId,
             error_details: {
@@ -268,7 +271,16 @@ export class AgentRuntimeService {
     }
 
     // Build prompt from agent config (now async to fetch atomic context)
-    const messages = await this.buildPrompt(agent, context, input);
+    let activeContract: RegistryContract | null = null;
+    if (agent.active_contract_id) {
+      try {
+        activeContract = await this.contractsService.findOne(agent.active_contract_id);
+      } catch (error) {
+        this.logger.warn(`Failed to load active contract ${agent.active_contract_id} for agent ${agentId}`);
+      }
+    }
+
+    const messages = await this.buildPrompt(agent, context, input, activeContract);
 
     // Get LLM config from agent
     const llmConfig: LlmConfig = {
@@ -500,12 +512,25 @@ export class AgentRuntimeService {
     agent: Agent,
     context: AgentContext,
     input?: any,
+    activeContract?: RegistryContract | null,
   ): Promise<CoreMessage[]> {
     const messages: CoreMessage[] = [];
 
     // System message from agent instructions - add dignity and clarity
     if (agent.instructions) {
-      const enhancedInstructions = this.enhanceInstructions(agent.instructions);
+      let enhancedInstructions = this.enhanceInstructions(agent.instructions);
+      
+      // Inject Contract Context
+      if (activeContract) {
+        enhancedInstructions += `\n\nIMPORTANT: You are operating under a legally binding contract (${activeContract.titulo}).
+Status: ${activeContract.estado_atual}
+Scope: ${activeContract.escopo ? activeContract.escopo.join(', ') : 'As defined in instructions'}
+Budget Limit: ${activeContract.valor_total_cents ? (activeContract.valor_total_cents / 100).toFixed(2) + ' ' + activeContract.moeda : 'N/A'}
+Deadline: ${activeContract.data_limite ? activeContract.data_limite.toISOString().split('T')[0] : 'N/A'}
+
+You MUST adhere to these constraints. Actions outside this scope may lead to contract penalties.`;
+      }
+
       messages.push({
         role: 'system',
         content: enhancedInstructions,
@@ -904,4 +929,3 @@ Remember: You're working in a collaborative environment. If you need clarificati
     return this.agentRepository.findOne({ where: { id: agentId } });
   }
 }
-

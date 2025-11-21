@@ -9,8 +9,12 @@ import { ApiKey } from './entities/api-key.entity';
 import { createHash, randomBytes } from 'crypto';
 import { AuditService } from '../audit/audit.service';
 
+import { CreateApiKeyDto } from './dto/create-api-key.dto';
+import { PeopleService } from '../registry/people/people.service';
+
 export interface JwtPayload {
   sub: string; // user_id
+  logline_id?: string; // Registry Identity
   email: string;
   role: UserRole;
   tenant_id?: string;
@@ -38,6 +42,7 @@ export class AuthService {
     @InjectRepository(ApiKey)
     private apiKeyRepository: Repository<ApiKey>,
     private jwtService: JwtService,
+    private peopleService: PeopleService,
     @Inject(forwardRef(() => AuditService))
     private auditService?: AuditService, // Optional to avoid circular dependency
   ) {}
@@ -48,7 +53,8 @@ export class AuthService {
   async register(
     email: string,
     password: string,
-    name?: string,
+    name: string, // name is required now
+    cpf: string, // cpf is required now
     tenantId?: string,
   ): Promise<{ user: User; tokens: AuthTokens }> {
     // Check if user already exists
@@ -60,16 +66,43 @@ export class AuthService {
       throw new BadRequestException('User with this email already exists');
     }
 
+    // 1. Register Person in Registry first (Identity First)
+    // If tenantId is provided, link person to tenant. If not, just create CorePerson.
+    // If tenantId is missing, we might need a default tenant or just register without tenant link initially?
+    // PeopleService.register requires tenant_id to create the initial relationship.
+    // If we are creating a root user (no tenant yet), we might have an issue.
+    // However, usually registration is within a context. Let's assume tenantId is provided or generated.
+    // For public registration, maybe we use a 'public' tenant ID or allow register without tenant link?
+    // Looking at PeopleService.register: it takes tenant_id as mandatory for the relationship.
+    
+    if (!tenantId) {
+        // TODO: Handle tenant-less registration if allowed (e.g. SaaS sign up creates new tenant)
+        // For now, we require tenantId or assume a default one should be handled by caller
+        // Let's proceed assuming tenantId is required for this "Bridge" implementation
+        throw new BadRequestException('Tenant ID is required for registration');
+    }
+
+    // Register/Find person in Registry
+    const person = await this.peopleService.register({
+        cpf,
+        email,
+        name,
+        tenant_id: tenantId,
+        role: 'admin', // Default role for new user registration? Or passed via DTO?
+        // Assuming 'admin' for self-registered users for now, or 'employee'
+    });
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Create user linked to person
     const user = this.userRepository.create({
       email,
       password_hash: passwordHash,
       name,
       tenant_id: tenantId,
       role: 'user',
+      logline_id: person.logline_id, // LINKED!
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -331,6 +364,7 @@ export class AuthService {
   ): Promise<AuthTokens> {
     const payload: JwtPayload = {
       sub: user.id,
+      logline_id: user.logline_id, // Included in token
       email: user.email,
       role: user.role,
       tenant_id: user.tenant_id,

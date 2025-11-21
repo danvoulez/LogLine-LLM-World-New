@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsUUID } from 'class-validator';
+import { IsEmail, IsString, IsOptional, IsUUID, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -8,12 +8,13 @@ export class RegisterDto {
   @MinLength(8)
   password: string;
 
-  @IsOptional()
   @IsString()
-  name?: string;
+  name: string;
+
+  @IsString()
+  cpf: string; // Required for Registry identity
 
   @IsOptional()
   @IsUUID()
   tenant_id?: string;
 }
-

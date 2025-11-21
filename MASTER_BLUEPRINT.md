@@ -1,29 +1,23 @@
 # LogLine LLM World - Master Blueprint
 
-> A **cloud‑native LLM-first Agent OS** + **App platform** built for Vercel deployment.
+> A **cloud‑native LLM-first Agent OS** + **App platform** built for **Hybrid Deployment** (Vercel + Railway).
 
-**Version:** 2.5  
-**Last Updated:** 2024-12-19  
-**Deployment Target:** Vercel (Serverless) + Vercel Postgres
+**Version:** 2.6
+**Last Updated:** 2024-11-21
+**Deployment Targets:** 
+* **Brain:** Vercel (Serverless) + Vercel Postgres
+* **Muscle:** Railway (Containerized Executor)
 
 **Recent Updates:**
+* ✅ **Phase 6 COMPLETE**: LogLine Executor (Sidecar/Muscle) implemented on Railway for heavy tools (Puppeteer, Code Execution).
+* ✅ **Phase 5 COMPLETE**: Registry Universal fully implemented (People, Agents, Contracts, Ideas, Objects, Apps).
+* ✅ **Financial Refactoring**: All monetary values standardized to **Integer Cents** to eliminate floating-point errors.
+* ✅ **Auth-Registry Bridge**: Users are now linked to Universal Identities (LogLine ID) upon registration.
+* ✅ **Agent Observability**: Full execution logging (inputs, outputs, costs, tools) for every agent run.
 * ✅ **Phase 4 Critical Fixes COMPLETE**: Policy Engine v1 fully integrated into ToolRuntimeService and AgentRuntimeService
 * ✅ **Tools Governance**: Added `risk_level` (low/medium/high) and `side_effects` columns to tools table
 * ✅ **Policy Enforcement**: All tool calls and agent calls now pass through Policy Engine v1 before execution
 * ✅ **Memory Security**: Added tenant/user/app ownership validation to Memory tools (prevents data exfiltration)
-* ✅ **Deep Code Audit Round 2 Fixes**: Cron Jobs for Vercel Serverless, API Key performance, Resume Run, Memory search metadata filtering, Race condition fixes, File size validation
-* ✅ **Phase 4 COMPLETE**: Memory Engine, Policy Engine v1, Auth & RBAC, Audit, Metrics, Alerts, Rate Limiting, Cron Jobs
-* ✅ **Test Coverage**: 12 new test files (53 new tests, 209 total tests, all passing)
-* ✅ **Codebase Review**: Complete review with principles verification (LLM-first: 9/10, Enterprise Safety: 10/10)
-* ✅ **Router Nodes**: LLM-powered routing using agents (implemented)
-* ✅ **Conditional Edges**: LLM-powered condition evaluation using agents (implemented)
-* ✅ JSON✯Atomic integration for structured LLM context
-* ✅ TDLN-T integration for natural language structuring
-* ✅ Dignified AI partnership implementation
-* ✅ Phase 2.5: Error Handling & Testing improvements
-* ✅ Golden Run (Canon) defined
-* ✅ Execution budgets per run
-* ✅ Policy semantics clarified
 
 **LLM-First Design**: This blueprint emphasizes LLM-first design where agents (LLM-powered) make routing, conditional, and tool selection decisions. See [LLM-First Design Review](./docs/design/LLM_FIRST_DESIGN_REVIEW.md) for compliance review.
 
@@ -39,7 +33,7 @@
 6. [Tools & Agents Design](#6-tools--agents-design)
 7. [App Platform & Manifest Spec](#7-app-platform--manifest-spec)
 8. [HTTP API Reference](#8-http-api-reference-mvp)
-9. [Deployment & Environments (Vercel)](#9-deployment--environments-vercel)
+9. [Deployment & Environments](#9-deployment--environments)
 10. [Observability, Testing & Maintenance](#10-observability-testing--maintenance)
 11. [Implementation Roadmap](#11-implementation-roadmap)
 12. [How to Extend the Platform Safely](#12-how-to-extend-the-platform-safely)
@@ -89,15 +83,12 @@ You're not just building "a chatbot". You're building:
 * Reduces hallucinations through structured context (JSON✯Atomic)
 * Improves understanding through natural language structuring (TDLN-T)
 
-### 1.4. Vercel-First Architecture
+### 1.4. Hybrid Architecture (Brain + Muscle)
 
-This blueprint is optimized for **Vercel deployment**:
+This blueprint is optimized for a **Hybrid Deployment**:
 
-* **Serverless Functions**: All API endpoints run as serverless functions
-* **Vercel Postgres**: Native Postgres with pgvector support for RAG
-* **Edge-Ready**: Designed for low latency and global distribution
-* **AI SDK v5**: Unified LLM interface with streaming support
-* **Natural Language DB**: Read/write database operations via natural language
+* **Brain (Vercel)**: Serverless, stateless, high-concurrency. Handles logic, orchestration, DB, and API.
+* **Muscle (Railway)**: Containerized, stateful, heavy-duty. Handles code execution, browser automation, and long-running tasks.
 
 ---
 
@@ -116,20 +107,21 @@ These are the names you'll see everywhere.
 * **View / Widget** – Declarative description of app UI (chat, table, trace…).
 * **Policy** – Rules that decide what is allowed (tools, modes, users).
 * **Memory** – Persisted context (profile, long-term, short-term) with RAG support.
+* **Registry** – Universal repository for People, Objects, Ideas, Contracts, and Apps.
+* **Executor** – Remote service for executing heavy/risky tools (Code, Browser).
 
 ---
 
 ## 3. Architecture Overview
 
-### 3.1. Three Planes
+### 3.1. Four Planes
 
-Think in three "planes":
+Think in four "planes":
 
-1. **Execution Plane** – runs workflows/agents
+1. **Execution Plane** – runs workflows/agents (Brain + Muscle)
 2. **Control Plane** – manages configuration & metadata
 3. **Experience Plane** – UI, apps, and developer ergonomics
-
-All running as **serverless functions on Vercel**, backed by **Vercel Postgres** (+ optional Redis for caching) and calling out to **LLM providers via AI SDK v5**.
+4. **Registry Plane** – Universal identity and asset management
 
 ### 3.2. Execution Plane
 
@@ -163,8 +155,17 @@ Responsible for *actually doing work*.
 * **Tool Runtime**
   * Registry + execution for **tools** (internal APIs, DB queries, 3rd party systems).
   * Enforces app/tool scopes and policy checks before side effects.
-  * Includes natural language DB read/write tools.
-  * Includes TDLN-T tools for natural language structuring and translation.
+  * **Hybrid Execution**:
+    * `builtin` tools run locally on Vercel.
+    * `remote` tools are proxied to the **Executor** service.
+
+* **Executor Service (The Muscle)**
+  * Runs on **Railway** (Docker).
+  * Handles "heavy" tools:
+    * `code_interpreter` (Python/JS sandbox).
+    * `web_browser` (Puppeteer/Playwright).
+    * `file_system` (Persistent storage operations).
+  * Secured via HMAC-SHA256 signature.
 
 * **Context Services**
   * **Context Summarizer**: Converts structured data to natural language summaries.
@@ -257,7 +258,7 @@ Defines **what exists and what's allowed**.
 
 * **Identity & Tenancy**
   * Integration with auth (JWT/OAuth/OIDC).
-  * Every request tagged with: `user_id`, `tenant_id`, `app_id`, `role`.
+  * Every request tagged with: `user_id`, `tenant_id`, `app_id`, `role`, `logline_id`.
   * Used by policies and data partitioning.
 
 ### 3.4. Experience Plane
@@ -286,7 +287,7 @@ What humans see and use.
 1. Front-end calls `/apps/:app_id/actions/:action_id`.
 2. App runtime resolves which **workflow** to run and builds input.
 3. Orchestrator starts a **run**.
-4. For each node in the workflow:faca os testes de integracao 
+4. For each node in the workflow:
    * creates a **step**
    * calls a handler (static / tool / agent)
    * logs **events**.
@@ -388,7 +389,7 @@ CREATE TABLE tools (
   name          VARCHAR(255) NOT NULL,
   description   TEXT,
   input_schema  JSONB NOT NULL, -- JSON Schema for tool inputs
-  handler_type  VARCHAR(50), -- 'code', 'http', 'builtin'
+  handler_type  VARCHAR(50), -- 'code', 'http', 'builtin', 'remote'
   handler_config JSONB, -- Handler-specific config
   risk_level    VARCHAR(20) NOT NULL DEFAULT 'low' CHECK (risk_level IN ('low', 'medium', 'high')),
   side_effects  TEXT[] NOT NULL DEFAULT '{}', -- ['database_read', 'database_write', 'memory_storage', ...]
@@ -406,6 +407,12 @@ CREATE TABLE agents (
   model_profile  JSONB NOT NULL, -- {provider: 'openai', model: 'gpt-4o', temperature: 0.7, max_tokens: 2000}
   allowed_tools  TEXT[] NOT NULL, -- array of tool IDs
   default_policies TEXT[] NOT NULL DEFAULT '{}', -- array of policy IDs
+  
+  -- Registry / Identity Fields
+  logline_id     VARCHAR(50), -- Universal ID with checksum
+  active_contract_id UUID,
+  avg_cost_per_run_cents INTEGER,
+  
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
@@ -451,10 +458,42 @@ CREATE TABLE app_actions (
 );
 ```
 
-### 4.4. Registry (Phase 5 - Planned)
+### 4.4. Registry Universal (Phase 5 - COMPLETE)
 
 ```sql
--- Registry de Apps (para descoberta e compartilhamento)
+-- Core People
+CREATE TABLE core_people (
+  logline_id    VARCHAR(50) PRIMARY KEY, -- LL-BR-2024-XXXXX-SUM
+  cpf_hash      VARCHAR(64) UNIQUE,
+  name          VARCHAR(255) NOT NULL,
+  email_primary VARCHAR(255),
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Registry Objects (now includes services)
+CREATE TABLE registry_objects (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  object_type     TEXT NOT NULL CHECK (object_type IN ('document', 'file', 'merchandise', 'collection', 'lost_found', 'inventory', 'service')),
+  name            TEXT NOT NULL,
+  tenant_id       UUID,
+  owner_logline_id VARCHAR(50),
+  metadata        JSONB,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Registry Contracts
+CREATE TABLE registry_contracts (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo          TEXT NOT NULL,
+  estado_atual    TEXT NOT NULL DEFAULT 'RASCUNHO',
+  valor_total_cents INTEGER,
+  penalidade_aplicada_cents INTEGER,
+  autor_logline_id VARCHAR(50),
+  contraparte_logline_id VARCHAR(50),
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Registry Apps (Marketplace)
 CREATE TABLE registry_apps (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   namespace       TEXT NOT NULL, -- '@owner/app-id'
@@ -476,41 +515,7 @@ CREATE TABLE registry_apps (
   published_at    TIMESTAMPTZ,
   UNIQUE(namespace, version)
 );
-
-CREATE INDEX idx_registry_apps_namespace ON registry_apps(namespace);
-CREATE INDEX idx_registry_apps_visibility ON registry_apps(visibility);
-CREATE INDEX idx_registry_apps_tags ON registry_apps USING GIN(tags);
-CREATE INDEX idx_registry_apps_rating ON registry_apps(rating DESC);
-
--- Reviews/Ratings
-CREATE TABLE registry_reviews (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  registry_app_id UUID NOT NULL REFERENCES registry_apps(id),
-  user_id         UUID NOT NULL,
-  tenant_id       UUID,
-  rating          INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-  review          TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(registry_app_id, user_id)
-);
-
--- Instalações
-CREATE TABLE registry_installations (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  registry_app_id UUID NOT NULL REFERENCES registry_apps(id),
-  installed_app_id VARCHAR(255) NOT NULL, -- ID do app instalado no tenant
-  tenant_id       UUID NOT NULL,
-  user_id         UUID NOT NULL, -- Quem instalou
-  version         TEXT NOT NULL,
-  installed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_registry_installations_tenant ON registry_installations(tenant_id);
-CREATE INDEX idx_registry_installations_registry_app ON registry_installations(registry_app_id);
 ```
-
-**Nota:** Esta seção será implementada na Phase 5. Veja [REGISTRY_PROPOSAL.md](./docs/design/REGISTRY_PROPOSAL.md) para detalhes completos.
 
 ### 4.5. Policies (Phase 4)
 
@@ -621,6 +626,7 @@ CREATE TABLE users (
   avatar_url    TEXT,
   role          TEXT NOT NULL DEFAULT 'user', -- admin|developer|user
   tenant_id     UUID,
+  logline_id    VARCHAR(50), -- Link to Registry Identity
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -1362,24 +1368,35 @@ An **App** is declared via a manifest. Backend imports it into DB.
 
 ---
 
-## 9. Deployment & Environments (Vercel)
+## 9. Deployment & Environments
 
-### 9.1. Vercel Setup
+### 9.1. Monorepo Strategy
+
+The repository is a **Monorepo** with two distinct deployment targets:
+
+1. **Backend (`/backend`)**:
+   * Deployed to **Vercel**.
+   * Serverless functions + Postgres.
+   * Triggers: Changes in `backend/**`.
+
+2. **Executor (`/executor`)**:
+   * Deployed to **Railway**.
+   * Docker container (Node.js + Puppeteer/Python).
+   * Triggers: Changes in `executor/**`.
+
+### 9.2. Vercel (Brain) Setup
 
 **Recommended setup:**
-
 * **Dev:** Local with Docker Compose for Postgres
 * **Prod:** Vercel (Serverless) + Vercel Postgres
 
 #### Vercel Configuration
-
 * **Backend**: NestJS app deployed as serverless functions
 * **Database**: Vercel Postgres (with pgvector extension)
 * **Frontend**: Next.js (or separate frontend app)
 * **Environment**: Automatic via Vercel environment variables
 
 #### Project Structure
-
 ```
 backend/
 ├── api/
@@ -1389,57 +1406,39 @@ backend/
 └── package.json
 ```
 
-### 9.2. Environment Variables
+### 9.3. Railway (Muscle) Setup
+
+* **Service**: Dockerfile based deployment.
+* **Environment Variables**:
+  * `PORT`: 8080
+  * `LOGLINE_SHARED_SECRET`: (Must match Backend's secret)
+
+### 9.4. Environment Variables (Backend)
 
 **Required:**
 * `POSTGRES_URL` - Automatically set by Vercel Postgres
 * `OPENAI_API_KEY` - For LLM calls (or other provider keys)
 * `NODE_ENV` - Set automatically by Vercel
+* `LOGLINE_EXECUTOR_URL` - URL of the deployed Railway service (e.g., `https://executor-production.up.railway.app`)
+* `LOGLINE_SHARED_SECRET` - Shared secret for signing requests to Executor
 
 **Optional:**
 * `ANTHROPIC_API_KEY` - For Claude models
 * `GOOGLE_GENERATIVE_AI_API_KEY` - For Gemini models
 * `LOG_LEVEL` - Logging level (default: info)
 
-### 9.3. Database Setup
-
-1. **Create Vercel Postgres Database**
-   * Vercel Dashboard → Storage → Create Database → Postgres
-   * `POSTGRES_URL` is automatically set
-
-2. **Enable pgvector Extension**
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS vector;
-   ```
-
-3. **Run Migrations**
-   * Use TypeORM migrations or manual SQL
-   * Schema auto-syncs in dev (disabled in production)
-
-### 9.4. Deployment Steps
+### 9.5. Deployment Steps
 
 1. **Connect Repository to Vercel**
-   * Push code to GitHub/GitLab/Bitbucket
-   * Import repository in Vercel dashboard
-   * Set root directory to `backend`
+   * Set root directory to `backend`.
+   * Vercel will auto-deploy changes to backend.
 
-2. **Configure Environment Variables**
-   * Add `OPENAI_API_KEY` and other provider keys
-   * `POSTGRES_URL` is automatically available
+2. **Connect Repository to Railway**
+   * Set root directory to `executor`.
+   * Railway will auto-deploy changes to executor.
 
-3. **Deploy**
-   * Automatic on push to main branch
-   * Or use `vercel --prod` CLI command
-
-### 9.5. Serverless Considerations
-
-* **Cold Starts**: First request after inactivity may be slower (~1-2 seconds)
-* **Function Timeout**: Default 10 seconds (60s on Pro plan)
-* **Long Workflows**: Consider background jobs or breaking into smaller steps
-* **Connection Pooling**: Vercel Postgres handles this automatically
-* **Streaming**: Use Server-Sent Events for real-time updates
-
-See [VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) for detailed deployment guide.
+3. **Configure Secrets**
+   * Ensure `LOGLINE_SHARED_SECRET` is identical in both environments.
 
 ---
 
@@ -1494,287 +1493,44 @@ See [VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) for detailed deployme
 ## 11. Implementation Roadmap
 
 ### Phase 1 – Platform Foundation (✅ COMPLETE)
-
-**Goal:** Have a reliable execution ledger running in the cloud.
-
-1. ✅ Infra:
-   * Vercel deployment setup
-   * Vercel Postgres database
-   * Serverless function configuration
-
-2. ✅ Core tables:
-   * `workflows`, `runs`, `steps`, `events`
-
-3. ✅ Orchestrator v0:
-   * Can run a linear workflow (hard-coded or simple JSON)
-   * Writes steps & events
-
-4. ✅ Basic APIs:
-   * `POST /workflows/:id/runs`
-   * `GET /runs/:id`
-   * `GET /runs/:id/events`
-
-**Done when:**
-You can deploy to Vercel, hit a public endpoint to start a run, and see its trace via API.
-
 ### Phase 1.5 – Serverless Optimizations (✅ COMPLETE)
+### Phase 2 – Agents, Tools & LLM Integration (✅ COMPLETE)
+### Phase 3 – App Layer & Developer Surface (✅ COMPLETE)
+### Phase 4 – Memory, Governance, and UX Polish (✅ COMPLETE)
 
-**Goal:** Optimize for Vercel serverless constraints (timeouts, cold starts, security).
+### Phase 5 – Registry Universal (✅ COMPLETE)
 
-1. ✅ Async Workflow Execution:
-   * `POST /workflows/:id/runs` returns immediately (no timeout risk)
-   * Workflows execute in background
-   * Status polling via `GET /runs/:id`
+**Goal:** Create a centralized, multitenant Universal Registry for managing Apps, People, Agents, Contracts, Ideas, and Objects.
 
-2. ✅ Streaming Support:
-   * `GET /runs/:id/stream` - Server-Sent Events (SSE) for real-time updates
-   * Enables monitoring long-running workflows without polling
+**Delivered:**
+* ✅ **People**: Universal Identity (LogLine ID) + Auth Bridge.
+* ✅ **Objects**: Trackable items + Services + Ownership History.
+* ✅ **Agents**: Identity, Training History, Execution Logs, Contracts.
+* ✅ **Contracts**: State Machine (Draft -> Active -> Completed), Penalties, Templates.
+* ✅ **Ideas**: Collaborative Voting, Cost/Priority Matrix.
+* ✅ **Apps**: Marketplace Metadata.
+* ✅ **Financials**: All values refactored to Integer Cents.
 
-3. ✅ Security for Natural Language DB Tools:
-   * Dry-run mode (default) - preview SQL before execution
-   * SQL validation - blocks destructive operations (DELETE, DROP, TRUNCATE, ALTER)
-   * Explicit confirmation required for writes
-   * Transaction support
+### Phase 6 – LogLine Executor (✅ COMPLETE)
 
-4. ⚠️ Drizzle ORM Evaluation:
-   * Documented migration path for better cold-start performance
-   * Decision: Defer to Phase 2 evaluation (TypeORM works, just slower)
+**Goal:** Extend the platform with a "Muscle" component for heavy-duty tasks.
 
-**Done when:**
-- Workflows execute asynchronously (no timeout risk)
-- Real-time updates available via streaming
-- Security measures documented for Phase 2 DB tools
+**Delivered:**
+* ✅ **Architecture**: Hybrid Vercel (Brain) + Railway (Muscle).
+* ✅ **Security**: HMAC-SHA256 signature verification.
+* ✅ **Executor Service**: Node.js/Express app on Railway.
+* ✅ **Tools**: `code_interpreter` (Python/JS), `web_browser` (Puppeteer).
+* ✅ **Integration**: `ToolRuntimeService` proxies `remote` tools to Executor.
 
-**See:** [CRITICAL_VERCEL_CONSIDERATIONS.md](./CRITICAL_VERCEL_CONSIDERATIONS.md) and [PHASE1.5_SERVERLESS_OPTIMIZATIONS.md](./PHASE1.5_SERVERLESS_OPTIMIZATIONS.md)
+### Phase 5.X – Registry Integration & Wiring (🚧 IN PROGRESS)
 
-### Phase 2 – Agents, Tools & LLM Integration
+**Goal:** Connect the "Brain" (Registry/Logic) with the "Muscle" (Executor/Agents) to create a fully integrated, LLM-first OS.
 
-**Goal:** Runs now use **real tools** and **agents** powered by an LLM.
-
-1. Add tables:
-   * `tools`, `agents`
-
-2. Implement:
-   * Tool runtime (`callTool`) with policy checks
-   * Agent runtime (`runAgentStep`) using AI SDK v5
-   * LLM Router (wraps AI SDK v5 for unified provider interface)
-
-3. Natural Language Database Tools:
-   * Read tool (SELECT queries only)
-   * Write tool (INSERT/UPDATE with confirmation and policy checks)
-
-4. Orchestrator:
-   * Support node types: `tool_node`, `agent_node`
-   * Trace includes: `tool_call`, `llm_call` events
-
-5. Simple policies:
-   * Hard-coded rules or minimal `policies` table
-   * Deny certain tool calls based on context
-
-**Done when:**
-A deployed workflow can call an LLM-backed agent, which calls a tool (including natural language DB operations), and you see everything in the trace.
-
-**See:** [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md)
-
-### Phase 3 – App Layer & Developer Surface
-
-**Goal:** Turn the engine into a **platform where you define Apps** with manifests and UI.
-
-1. Add tables:
-   * `apps`, `app_scopes`, `app_workflows`, `app_actions`
-   * optionally `app_views`, `app_widgets` (for UI binding)
-
-2. Implement:
-   * App manifest format (JSON/YAML)
-   * `POST /apps/import` to load/validate manifests
-   * App Runtime API: `POST /apps/:app_id/actions/:action_id`
-
-3. Link runs to apps:
-   * `runs` gets `app_id`, `app_action_id`
-
-4. Enforce scopes:
-   * Tool runtime checks app/tool scopes before executing (`app_scopes`)
-
-5. Front-end shell:
-   * App list/switcher
-   * Simple view: app page with:
-     * Chat panel bound to an app action
-     * Trace viewer for runs of that app
-
-**Done when:**
-You can define an app as a manifest, import it, open it in the UI, trigger actions, and watch its runs & traces — without changing core code.
-
-### Phase 4 – Memory, Governance, and UX Polish ✅ **COMPLETE**
-
-**Goal:** Make it **LLM‑first AND enterprise‑safe**.
-
-**Status:** ✅ **IMPLEMENTED** (except Studio UI - deferred)
-
-1. **Memory (RAG-enabled)** ✅:
-   * `memory_items` table with pgvector embeddings
-   * `resources` table for chunked content
-   * Memory tools for: store / retrieve / search / delete
-   * EmbeddingService (OpenAI, Anthropic, Google)
-   * MemoryService with semantic search
-   * Integration into agent context for RAG flows
-   * **Security**: Tenant/user/app ownership validation enforced in Memory tools:
-     * `owner_type='tenant'` → forces `owner_id` from `context.tenantId`
-     * `owner_type='user'` → forces `owner_id` from `context.userId`
-     * `owner_type='app'` → validates `owner_id` matches `context.appId`
-   * Prevents data exfiltration between tenants/users/apps
-
-2. **Policy Engine v1** ✅:
-   * `policies` table with rule expressions
-   * PolicyEngineV1Service with rule evaluation
-   * Policy API (CRUD endpoints)
-   * Integration: run start enforcement, tool call enforcement
-   * Mode enforcement (draft/auto)
-   * Policy modifications (mode override, input modifications)
-
-3. **Modes** ✅:
-   * `draft | auto` per run/action/app
-   * Policy-based mode restrictions
-   * Mode enforcement in orchestrator
-
-4. **Studio** ⚠️:
-   * UI to:
-     * list runs, inspect traces
-     * manage tools, agents, workflows, apps
-     * see policy hits, errors
-   * **Status:** Deferred (as requested)
-
-5. **Hardening** ✅:
-   * **Auth & RBAC**:
-     * JWT authentication (access + refresh tokens)
-     * User/tenant management
-     * Role-based access control (admin, developer, user)
-     * API key management
-     * Guards and decorators for route protection
-   * **Audit Logging**:
-     * Complete audit trail of all critical actions
-     * Query API for log inspection
-     * Automatic cleanup (90 days retention)
-   * **Metrics & Monitoring**:
-     * Comprehensive metrics (runs, LLM, tools, policies, errors, performance)
-     * Prometheus format support
-     * `/metrics` endpoint (JSON or Prometheus)
-   * **Alerts System**:
-     * 5 rule types (error_rate, budget_exceeded, policy_denials, memory_usage, rate_limit)
-     * 4 notification channels (webhook, email, slack, pagerduty)
-     * Spam prevention (1 hour cooldown)
-     * Alert history and resolution
-   * **Rate Limiting**:
-     * Per-user limits (1000 req/min)
-     * Per-tenant limits (10000 req/min)
-     * Per-API-key limits (5000 req/min)
-     * Per-IP limits (100 req/min, fallback)
-     * Rate limit headers in responses
-   * **Scheduled Tasks (Cron)**:
-     * Alert checks every 5 minutes
-     * Audit log cleanup daily at 2 AM
-     * Alert history cleanup daily at 3 AM
-     * Rate limit store cleanup every hour
-
-**Done when:**
-You can onboard a new app, constrain what it can touch (tools/memory), have different modes (draft/auto), and feel safe letting it operate for real data.
-
-**Status:** ✅ **COMPLETE** - All hardening features implemented and tested (23 unit tests passing)
-
-**See:** [PHASE4_COMPLETE.md](./PHASE4_COMPLETE.md)
-
-### Phase 5 – Registry Universal (📋 PLANNED)
-
-**Goal:** Criar um **Registry Universal** multitenant e cross-app para gerenciar Pessoas, Contratos, Ideias, Objetos e Apps.
-
-**Conceito:**
-O Registry Universal é o coração do LogLineOS - um repositório centralizado que gerencia:
-1. **Apps** - Aplicações (marketplace público)
-2. **Pessoas** - Identidades universais (LogLine ID)
-3. **Agentes** - Agentes LLM com identidade, memória, onboarding e contratos
-4. **Contratos** - Acordos executáveis (máquina de estados)
-5. **Ideias** - Democracia orçamentária (votação colaborativa)
-6. **Objetos** - Matéria inanimada rastreável (documentos, mercadorias, estoque, etc.)
-
-**Princípios:**
-- ✅ **Multitenant** - Isolamento por tenant quando necessário
-- ✅ **Cross-App** - Compartilhamento entre apps quando apropriado
-- ✅ **Apps Participam** - Apps podem criar/ler/atualizar entidades
-- ✅ **Registry Único** - Uma API unificada para todos os tipos
-
-**Problema Identificado:**
-- ✅ Apps têm `visibility` (`private`, `org`, `public`)
-- ❌ **Falta Registry Universal** para Pessoas, Contratos, Ideias, Objetos
-- ❌ Não há identidade universal (LogLine ID)
-- ❌ Não há sistema de votação para ideias
-- ❌ Não há máquina de estados para contratos
-- ❌ Não há rastreabilidade de objetos
-
-**Proposta Expandida:**
-
-#### 5.1. Pessoas - Identidade Universal
-- **LogLine ID**: `LL-BR-2024-000123456` (único, permanente)
-- **Dois níveis**: Cross-App (universal) + Tenant (isolado)
-- **KYC uma vez**: Válido em todo ecossistema
-- **APIs**: `POST /registry/people/register`, `GET /registry/people/{logline_id}`, `GET /registry/people/search`
-
-#### 5.2. Objetos - Matéria Rastreável
-- **Tipos**: Documentos, Arquivos, Mercadorias, Acervo, Lost & Found, Estoque
-- **Rastreabilidade**: De onde veio → onde está → para onde foi
-- **APIs**: `POST /registry/objects`, `PUT /registry/objects/{id}/transfer`, `POST /registry/objects/{id}/movements`
-
-#### 5.3. Agentes - Identidade, Dignidade e Responsabilidade
-- **LogLine Agent ID**: `LL-AGENT-2024-000123456` (identidade universal)
-- **Memória própria**: Cada agente tem memória isolada (owner_type='agent')
-- **Onboarding/Treinamento**: Geral, personalizado ou custom (com certificação)
-- **Agentes sob contrato**: Contratos definem limites, escopo e responsabilidade
-- **Enforcement**: Policy Engine verifica `contract_scope` antes de cada execução
-- **APIs**: `POST /registry/agents`, `POST /registry/agents/{id}/train`, `POST /registry/agents/{id}/contract`
-
-#### 5.4. Ideias - Democracia Orçamentária
-- **Votação colaborativa**: Prioridade consensual (média ponderada)
-- **Matriz Custo x Prioridade**: Quick Wins vs Investimentos Estratégicos
-- **Fluxo**: Submissão → Votação → Análise → Decisão → Execução → Retrospectiva
-- **APIs**: `POST /registry/ideas`, `POST /registry/ideas/{id}/vote`, `GET /registry/ideas/{id}/matrix`
-
-#### 5.5. Contratos - Acordos Executáveis
-- **Máquina de estados**: RASCUNHO → VIGENTE → QUESTIONADO / CONCLUÍDO / CANCELADO → PENALIZADO
-- **Questionamento automático**: Prazo expirado → Período de defesa → Resolução
-- **Despacho**: Público, Hierárquico, ou Automatizado (substituto de testemunha)
-- **APIs**: `POST /registry/contracts`, `POST /registry/contracts/{id}/sign`, `POST /registry/contracts/{id}/question`
-
-#### 5.6. Apps - Marketplace
-- **Namespace público**: `@owner/app-id` (ex: `@logline/ticket-triage`)
-- **Versionamento semântico**: `1.0.0`, `1.1.0`, `2.0.0`
-- **Discovery**: `GET /registry/apps?q=...&tags=...&owner=...`
-- **Instalação**: `POST /registry/apps/:namespace/install`
-
-#### 5.7. Relacionamentos
-- **Schema genérico**: `registry_relationships` para relacionar qualquer entidade
-- **Tipos**: `owns`, `created`, `references`, `depends_on`, `transforms_to`
-- **Exemplos**: Pessoa → Objeto (owns), Ideia → Contrato (transforms_to)
-
-**Schemas Principais:**
-- `core_people` - Identidade universal (LogLine ID)
-- `tenant_people_relationships` - Relacionamento tenant-pessoa
-- `registry_objects` - Objetos rastreáveis
-- `registry_ideas` - Ideias com votação
-- `registry_contracts` - Contratos executáveis
-- `registry_apps` - Apps do marketplace
-- `registry_relationships` - Relacionamentos genéricos
-
-**Done when:**
-- Pessoas têm LogLine ID universal e podem ser vinculadas entre tenants
-- Objetos são rastreáveis com histórico completo de movimentação
-- Ideias têm sistema de votação e priorização consensual
-- Contratos têm máquina de estados com questionamento e despacho
-- Apps podem ser publicados e instalados do marketplace
-- Relacionamentos entre entidades são rastreáveis
-
-**Status:** 📋 **PLANNED** - Proposta expandida completa em [REGISTRY_UNIVERSAL_PROPOSAL.md](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md)
-
-**See:** 
-- [REGISTRY_UNIVERSAL_PROPOSAL.md](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md) - Proposta expandida completa
-- [REGISTRY.md](../REGISTRY.md) - Documento original com casos de uso detalhados
+**Tasks:**
+* [ ] **Registry Tools**: Expose Registry functions (Lookup Person, Check Contract) as agent tools.
+* [ ] **Contract Context**: Inject active contract details into Agent System Prompt.
+* [ ] **Event Emission**: Emit events for Registry changes (Contract Signed, Object Moved).
+* [ ] **Full System Test**: Verify end-to-end flow (User -> Idea -> Contract -> Agent -> Execution).
 
 ---
 
@@ -1814,55 +1570,21 @@ O Registry Universal é o coração do LogLineOS - um repositório centralizado 
 ## References & Documentation
 
 ### Core Design & Philosophy
+- [LLM-First Design Review](./docs/design/LLM_FIRST_DESIGN_REVIEW.md)
+- [AI Partner Philosophy](./docs/design/AI_PARTNER_PHILOSOPHY.md)
+- [Dignified AI Partnership Implementation](./docs/design/DIGNIFIED_AI_PARTNERSHIP_IMPLEMENTATION.md)
+- [Codebase Review 2024](./CODEBASE_REVIEW_2024.md)
 
-- [LLM-First Design Review](./docs/design/LLM_FIRST_DESIGN_REVIEW.md) - LLM-first design compliance review
-- [AI Partner Philosophy](./docs/design/AI_PARTNER_PHILOSOPHY.md) - Dignified AI partnership principles
-- [Dignified AI Partnership Implementation](./docs/design/DIGNIFIED_AI_PARTNERSHIP_IMPLEMENTATION.md) - Implementation details
-- [Codebase Review 2024](./CODEBASE_REVIEW_2024.md) - Comprehensive codebase review
-
-### Structured Data & Context
-
-- [JSON✯Atomic Analysis](./docs/design/JSON_ATOMIC_ANALYSIS.md) - JSON✯Atomic format analysis
-- [JSON✯Atomic Implementation Plan](./docs/implementation/JSON_ATOMIC_IMPLEMENTATION_PLAN.md) - Implementation plan
-- [JSON✯Atomic Phase 1 Complete](./docs/implementation/JSON_ATOMIC_PHASE1_COMPLETE.md) - Phase 1 completion
-- [JSON✯Atomic Phase 2 Complete](./docs/implementation/JSON_ATOMIC_PHASE2_COMPLETE.md) - Phase 2 completion
-
-### Natural Language Structuring
-
-- [TDLN-T Protocol Analysis](./docs/design/TDLN_T_PROTOCOL_ANALYSIS.md) - TDLN-T protocol analysis
-- [TDLN-T Refocus](./docs/implementation/TDLN_T_REFOCUS.md) - Refocus to Natural Language → JSON✯Atomic
-- [TDLN-T Refocus Complete](./docs/implementation/TDLN_T_REFOCUS_COMPLETE.md) - Implementation complete
-- [TDLN-T Phase 1 Complete](./docs/implementation/TDLN_T_PHASE1_COMPLETE.md) - Phase 1 completion
-
-### Implementation Guides
-
-- [PHASE2_AI_SDK_INTEGRATION.md](./PHASE2_AI_SDK_INTEGRATION.md) - AI SDK v5 integration
-- [PHASE4_RAG_MEMORY_INTEGRATION.md](./PHASE4_RAG_MEMORY_INTEGRATION.md) - RAG Memory Engine
-- [backend/VERCEL_DEPLOYMENT.md](./backend/VERCEL_DEPLOYMENT.md) - Vercel deployment guide
-- [backend/AI_SDK_QUICK_START.md](./backend/AI_SDK_QUICK_START.md) - AI SDK quick reference
-
-### Architecture & Frontend
-
-- [Frontend App Guidelines](./docs/architecture/FRONTEND_APP_GUIDELINES.md) - Frontend app development guidelines
-- [Mobile iPhone Architecture](./docs/architecture/MOBILE_IPHONE_ARCHITECTURE.md) - Mobile-first architecture
-- [Agent UI Architecture](./docs/architecture/AGENT_UI_ARCHITECTURE.md) - Agent UI architecture
-- [File Operations Architecture](./docs/architecture/FILE_OPERATIONS_ARCHITECTURE.md) - File operations design
-
-### Registry & Marketplace
-
-- [Registry Universal Proposal](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md) - **Registry Universal expandido** (Pessoas, Contratos, Ideias, Objetos, Apps)
-- [Registry Proposal](./docs/design/REGISTRY_PROPOSAL.md) - Registry inicial para apps (legado)
-- [Registry.md](../REGISTRY.md) - Documento original com casos de uso detalhados (Padaria Digital, etc.)
+### Architecture
+- [Registry Universal Proposal](./docs/design/REGISTRY_UNIVERSAL_PROPOSAL.md)
+- [Executor Spec](./docs/architecture/EXECUTOR_SPEC.md)
+- [Frontend App Guidelines](./docs/architecture/FRONTEND_APP_GUIDELINES.md)
 
 ### External Resources
-
-- [Vercel AI SDK v5 Documentation](https://v5.ai-sdk.dev/)
-- [AI SDK RAG Agent Guide](https://ai-sdk.dev/llms.txt)
-- [Natural Language Postgres Template](https://vercel.com/templates/next.js/natural-language-postgres)
-- [Vercel Postgres Documentation](https://vercel.com/docs/storage/vercel-postgres)
-- [pgvector Documentation](https://github.com/pgvector/pgvector)
+- [Vercel AI SDK v5](https://v5.ai-sdk.dev/)
+- [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres)
+- [Railway Documentation](https://docs.railway.app/)
 
 ---
 
 **End of Master Blueprint**
-

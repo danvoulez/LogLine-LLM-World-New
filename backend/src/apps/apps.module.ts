@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { App } from './entities/app.entity';
 import { AppScope } from './entities/app-scope.entity';
@@ -18,9 +18,9 @@ import { Tool } from '../tools/entities/tool.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([App, AppScope, AppWorkflow, AppAction, Workflow, Tool]),
-    RunsModule,
+    forwardRef(() => RunsModule),
     WorkflowsModule,
-    ToolsModule,
+    forwardRef(() => ToolsModule),
     PoliciesModule,
   ],
   controllers: [AppsRuntimeController],

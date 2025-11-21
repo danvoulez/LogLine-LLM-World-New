@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tool } from './entities/tool.entity';
 import { ToolRuntimeService } from './tool-runtime.service';
@@ -12,19 +12,31 @@ import { AppsModule } from '../apps/apps.module';
 import { PoliciesModule } from '../policies/policies.module';
 import { MemoryModule } from '../memory/memory.module';
 import { MemoryTool } from './memory.tool';
+import { RegistryModule } from '../registry/registry.module';
+import { HttpTool } from './standard/http.tool';
+import { GithubTool } from './standard/github.tool';
+import { MathTool } from './standard/math.tool';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Tool, Event]),
     LlmModule,
-    RunsModule,
-    AppsModule, // Import AppsModule to access AppScopeCheckerService
+    forwardRef(() => RunsModule),
+    forwardRef(() => AppsModule), // Circular dependency
     PoliciesModule, // Import PoliciesModule to access PolicyEngineV0Service
     MemoryModule, // Import MemoryModule to access MemoryService
+    RegistryModule, // Import RegistryModule to access RegistryTool
   ],
   controllers: [ToolsController],
-  providers: [ToolRuntimeService, NaturalLanguageDbTool, MemoryTool, SchemaValidatorService],
+  providers: [
+    ToolRuntimeService,
+    NaturalLanguageDbTool,
+    MemoryTool,
+    SchemaValidatorService,
+    HttpTool,
+    GithubTool,
+    MathTool,
+  ],
   exports: [ToolRuntimeService],
 })
 export class ToolsModule {}
-

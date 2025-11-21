@@ -7,6 +7,7 @@ import { Tool } from '../tools/entities/tool.entity';
 import { Run } from '../runs/entities/run.entity';
 import { Agent } from '../agents/entities/agent.entity';
 import { App } from '../apps/entities/app.entity';
+import { ObjectsService } from '../registry/objects/objects.service';
 
 export interface PolicyDecision {
   allowed: boolean;
@@ -55,6 +56,7 @@ export class PolicyEngineV1Service {
     private agentRepository: Repository<Agent>,
     @InjectRepository(App)
     private appRepository: Repository<App>,
+    private objectsService: ObjectsService,
   ) {}
 
   /**
@@ -167,6 +169,9 @@ export class PolicyEngineV1Service {
       appId?: string;
       userId?: string;
       tenantId: string;
+      toolId?: string; // For contract scope enforcement
+      costCents?: number; // For contract scope enforcement
+      llmCallsCount?: number; // For contract scope enforcement
     },
   ): Promise<PolicyDecision> {
     // Load agent and run for context
@@ -180,6 +185,14 @@ export class PolicyEngineV1Service {
       };
     }
 
+    // First, check agent contract scope if agent has active contract
+    if (agent.active_contract_id && agent.contract_scope) {
+      const contractCheck = this.checkAgentContractScope(agent, context);
+      if (!contractCheck.allowed) {
+        return contractCheck;
+      }
+    }
+
     const evaluationContext: PolicyEvaluationContext = {
       userId: context.userId,
       tenantId: context.tenantId,
@@ -191,6 +204,78 @@ export class PolicyEngineV1Service {
     };
 
     return this.evaluatePolicies(evaluationContext);
+  }
+
+  /**
+   * Check if agent action complies with contract scope
+   */
+  private checkAgentContractScope(
+    agent: Agent,
+    context: {
+      toolId?: string;
+      costCents?: number;
+      llmCallsCount?: number;
+      workflowId?: string;
+      action?: string;
+    },
+  ): PolicyDecision {
+    if (!agent.contract_scope) {
+      return { allowed: true };
+    }
+
+    const scope = agent.contract_scope;
+
+    // Check allowed tools
+    if (context.toolId && scope.allowed_tools) {
+      if (!scope.allowed_tools.includes(context.toolId)) {
+        return {
+          allowed: false,
+          reason: `Tool ${context.toolId} not allowed by agent contract. Allowed tools: ${scope.allowed_tools.join(', ')}`,
+        };
+      }
+    }
+
+    // Check max cost per run
+    if (context.costCents !== undefined && scope.max_cost_per_run_cents !== undefined) {
+      if (context.costCents > scope.max_cost_per_run_cents) {
+        return {
+          allowed: false,
+          reason: `Cost ${context.costCents} cents exceeds contract limit of ${scope.max_cost_per_run_cents} cents per run`,
+        };
+      }
+    }
+
+    // Check max LLM calls per run
+    if (context.llmCallsCount !== undefined && scope.max_llm_calls_per_run !== undefined) {
+      if (context.llmCallsCount > scope.max_llm_calls_per_run) {
+        return {
+          allowed: false,
+          reason: `LLM calls count ${context.llmCallsCount} exceeds contract limit of ${scope.max_llm_calls_per_run} per run`,
+        };
+      }
+    }
+
+    // Check allowed workflows
+    if (context.workflowId && scope.allowed_workflows) {
+      if (!scope.allowed_workflows.includes(context.workflowId)) {
+        return {
+          allowed: false,
+          reason: `Workflow ${context.workflowId} not allowed by agent contract. Allowed workflows: ${scope.allowed_workflows.join(', ')}`,
+        };
+      }
+    }
+
+    // Check restricted actions
+    if (context.action && scope.restricted_actions) {
+      if (scope.restricted_actions.includes(context.action)) {
+        return {
+          allowed: false,
+          reason: `Action ${context.action} is restricted by agent contract`,
+        };
+      }
+    }
+
+    return { allowed: true };
   }
 
   /**
@@ -214,6 +299,62 @@ export class PolicyEngineV1Service {
       workflowId,
       mode: context.mode || 'draft',
       input: context.input,
+    };
+
+    return this.evaluatePolicies(evaluationContext);
+  }
+
+  /**
+   * Check access to a Registry Object (Ownership-Based Access Control - OBAC)
+   */
+  async checkObjectAccess(
+    objectId: string,
+    loglineId: string, // Must be the LogLine ID (not Auth User ID)
+    action: 'read' | 'write' | 'transfer',
+    context: {
+      runId?: string;
+      appId?: string;
+      tenantId: string;
+    },
+  ): Promise<PolicyDecision> {
+    // 1. Check Object Ownership/Custody
+    try {
+      const object = await this.objectsService.findOne(objectId);
+      
+      // If user is owner or custodian, ALLOW (implicit permission)
+      if (
+        object.owner_logline_id === loglineId ||
+        object.current_custodian_logline_id === loglineId
+      ) {
+        return {
+          allowed: true,
+          reason: `User ${loglineId} is owner or custodian of object ${objectId}`,
+        };
+      }
+
+      // If object is public or tenant-visible (and user in tenant)
+      if (action === 'read') {
+        if (object.visibility === 'public') {
+          return { allowed: true, reason: 'Object is public' };
+        }
+        if (object.visibility === 'tenant' && object.tenant_id === context.tenantId) {
+          return { allowed: true, reason: 'Object is visible to tenant' };
+        }
+      }
+    } catch (error) {
+      // Object not found or error
+      return { allowed: false, reason: `Object ${objectId} not found` };
+    }
+
+    // 2. Fallback to Policy Evaluation (RBAC/ABAC)
+    const evaluationContext: PolicyEvaluationContext = {
+      userId: loglineId, // Treating LogLine ID as user ID for policy context
+      tenantId: context.tenantId,
+      appId: context.appId,
+      action: 'memory_access', // Mapping object access to memory_access type for now, or add new type
+      resourceId: objectId, // Generic resource ID
+      runId: context.runId,
+      loglineId, // Explicit field
     };
 
     return this.evaluatePolicies(evaluationContext);

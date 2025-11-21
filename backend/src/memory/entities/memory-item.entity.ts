@@ -53,4 +53,3 @@ export class MemoryItem {
   @OneToMany(() => Resource, (resource) => resource.memory_item, { cascade: true })
   resources: Resource[];
 }
-

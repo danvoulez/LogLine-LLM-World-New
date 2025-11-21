@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter'; // NEW
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -33,6 +34,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { RateLimitingModule } from './rate-limiting/rate-limiting.module';
 import { CronModule } from './cron/cron.module';
+import { RegistryModule } from './registry/registry.module';
 import { File } from './files/entities/file.entity';
 import { MemoryItem } from './memory/entities/memory-item.entity';
 import { Resource } from './memory/entities/resource.entity';
@@ -43,6 +45,19 @@ import { ApiKey } from './auth/entities/api-key.entity';
 import { AuditLog } from './audit/entities/audit-log.entity';
 import { AlertConfig } from './alerts/entities/alert-config.entity';
 import { AlertHistory } from './alerts/entities/alert-history.entity';
+import { CorePerson } from './registry/people/entities/core-person.entity';
+import { TenantPeopleRelationship } from './registry/people/entities/tenant-people-relationship.entity';
+import { RegistryObject } from './registry/objects/entities/registry-object.entity';
+import { RegistryObjectMovement } from './registry/objects/entities/registry-object-movement.entity';
+import { AgentTrainingHistory } from './registry/agents/entities/agent-training-history.entity';
+import { AgentEvaluation } from './registry/agents/entities/agent-evaluation.entity';
+import { AgentExecutionLog } from './registry/agents/entities/agent-execution-log.entity';
+import { RegistryIdea } from './registry/ideas/entities/registry-idea.entity';
+import { RegistryIdeaVote } from './registry/ideas/entities/registry-idea-vote.entity';
+import { RegistryContract } from './registry/contracts/entities/registry-contract.entity';
+import { RegistryContractStateHistory } from './registry/contracts/entities/registry-contract-state-history.entity';
+import { ContractTemplate } from './registry/contracts/entities/contract-template.entity';
+import { RegistryRelationship } from './registry/relationships/entities/registry-relationship.entity';
 import { DataSource } from 'typeorm';
 
 // Parse POSTGRES_URL if available (Vercel Postgres format)
@@ -54,7 +69,7 @@ function getDatabaseConfig() {
     return {
       type: 'postgres' as const,
       url: process.env.POSTGRES_URL,
-      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File, MemoryItem, Resource, Policy, User, Session, ApiKey, AuditLog, AlertConfig, AlertHistory],
+      entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File, MemoryItem, Resource, Policy, User, Session, ApiKey, AuditLog, AlertConfig, AlertHistory, CorePerson, TenantPeopleRelationship, RegistryObject, RegistryObjectMovement, AgentTrainingHistory, AgentEvaluation, AgentExecutionLog, RegistryIdea, RegistryIdeaVote, RegistryContract, RegistryContractStateHistory, ContractTemplate, RegistryRelationship],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
       // Vercel Postgres requires SSL in production
@@ -84,7 +99,7 @@ function getDatabaseConfig() {
     username: process.env.DB_USERNAME || 'user',
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_DATABASE || 'logline',
-    entities: [Workflow, Run, Step, Event, Tool, Agent],
+    entities: [Workflow, Run, Step, Event, Tool, Agent, App, AppScope, AppWorkflow, AppAction, File, MemoryItem, Resource, Policy, User, Session, ApiKey, AuditLog, AlertConfig, AlertHistory, CorePerson, TenantPeopleRelationship, RegistryObject, RegistryObjectMovement, AgentTrainingHistory, AgentEvaluation, AgentExecutionLog, RegistryIdea, RegistryIdeaVote, RegistryContract, RegistryContractStateHistory, ContractTemplate, RegistryRelationship],
     synchronize: process.env.NODE_ENV !== 'production',
     logging: process.env.NODE_ENV === 'development',
   };
@@ -115,11 +130,11 @@ function getDatabaseConfig() {
     RunsModule,
     LlmModule,
     ToolsModule,
-          AgentsModule,
-          AppsModule,
-          FilesModule,
-          TdlnTModule, // TDLN-T deterministic translation
-          MemoryModule,
+    AgentsModule,
+    AppsModule,
+    FilesModule,
+    TdlnTModule, // TDLN-T deterministic translation
+    MemoryModule,
     PoliciesModule, // Memory & RAG engine
     AuthModule, // Authentication & RBAC
     AuditModule, // Audit logging
@@ -127,7 +142,9 @@ function getDatabaseConfig() {
     AlertsModule, // Alerts system
     RateLimitingModule, // Enhanced rate limiting
     CronModule, // Scheduled tasks
-        ],
+    RegistryModule, // Universal Registry (People, Objects)
+    EventEmitterModule.forRoot(),
+  ],
   controllers: [AppController, DatabaseController],
   providers: [
     AppService,
@@ -136,6 +153,7 @@ function getDatabaseConfig() {
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+      // Apply rate limiting to all routes (can be overridden with @SkipThrottle)
     },
     // Enable global exception filter
     {
