@@ -1,15 +1,15 @@
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, IsBoolean, IsObject, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PolicyScope, PolicyEffect, PolicyRuleExpr } from '../entities/policy.entity';
+import { PolicyScope, PolicyEffect, PolicyRuleExpr, PolicyOperator } from '../entities/policy.entity';
 
 export class PolicyConditionDto {
   @IsString()
   @IsNotEmpty()
   field: string;
 
-  @IsString()
+  @IsEnum(['equals', 'not_equals', 'in', 'not_in', 'greater_than', 'less_than', 'contains', 'starts_with', 'ends_with', 'exists', 'not_exists'])
   @IsNotEmpty()
-  operator: string;
+  operator: PolicyOperator;
 
   @IsOptional()
   value?: any;
