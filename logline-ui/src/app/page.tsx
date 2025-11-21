@@ -19,11 +19,23 @@ export default function AgentOS() {
     setError(null);
     
     try {
+      // fetchLayoutForIntent already handles errors internally and falls back to mock
       const result = await fetchLayoutForIntent(prompt);
       setLayout(result);
+      // Clear any previous errors if we got a result (even if it's mock data)
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load layout');
+      // This should rarely happen since fetchLayoutForIntent has internal error handling
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load layout';
+      setError(errorMessage);
       console.error('Error executing prompt:', err);
+      // Still try to show mock layout as fallback
+      try {
+        const mockResult = await fetchLayoutForIntent(prompt);
+        setLayout(mockResult);
+      } catch (mockErr) {
+        console.error('Even mock layout failed:', mockErr);
+      }
     } finally {
       setLoading(false);
     }

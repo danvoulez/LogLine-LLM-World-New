@@ -13,21 +13,31 @@ export async function fetchLayoutForIntent(intent: string): Promise<UILayout> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({ prompt: intent }),
+      // Add credentials for CORS if needed
+      credentials: 'omit',
     });
 
     if (response.ok) {
       const data = await response.json();
-      return data.layout as UILayout;
+      if (data.layout) {
+        return data.layout as UILayout;
+      }
+      // If response doesn't have layout, fallback
+      console.warn('Backend response missing layout field, using mock data');
+      return getMockLayout(intent);
     }
 
-    // Fallback: If endpoint doesn't exist yet, use mock data
-    // This will be replaced once backend endpoint is implemented
-    console.warn('Backend render endpoint not available, using mock data');
+    // If response is not ok, log and fallback
+    const errorText = await response.text();
+    console.warn(`Backend render endpoint returned ${response.status}: ${errorText.substring(0, 100)}`);
     return getMockLayout(intent);
   } catch (error) {
+    // Network error or CORS issue
     console.error('Error fetching layout from backend:', error);
+    console.warn('Falling back to mock data. Backend may be unreachable or CORS blocked.');
     // Fallback to mock data on error
     return getMockLayout(intent);
   }
