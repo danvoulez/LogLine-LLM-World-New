@@ -69,6 +69,15 @@ export class Run {
   @Column({ type: 'jsonb', nullable: true })
   result: Record<string, any> | null;
 
+  @Column({ type: 'integer', nullable: true })
+  cost_limit_cents: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  llm_calls_limit: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  latency_slo_ms: number | null;
+
   @CreateDateColumn()
   created_at: Date;
 

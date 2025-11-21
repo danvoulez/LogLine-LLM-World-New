@@ -279,26 +279,69 @@ export class TdlnTService {
 
   /**
    * Check if a task is deterministic (can use TDLN-T instead of LLM)
+   * 
+   * Expanded heuristics:
+   * - Simple translation requests
+   * - Text transformations (uppercase, lowercase, trim, reverse)
+   * - Format conversions (date, number formatting)
+   * - Dictionary lookups
+   * - Code/identifier preservation tasks
    */
   isDeterministicTask(input: any): boolean {
-    // Deterministic if:
-    // - Simple translation (dictionary lookup)
-    // - Format conversion (structured patterns)
-    // - Data extraction (known patterns)
-    
-    // NOT deterministic if:
-    // - Complex reasoning required
-    // - Context-dependent decisions
-    // - Creative tasks
-
     if (typeof input === 'string') {
-      // Check if it's a simple translation request
-      if (input.match(/^(translate|convert|transform)\s+/i)) {
+      const normalized = input.trim().toLowerCase();
+
+      // Translation requests
+      if (normalized.match(/^(translate|convert|transform)\s+/)) {
+        return true;
+      }
+
+      // Text transformations
+      if (normalized.match(/^(uppercase|lowercase|capitalize|trim|reverse|replace)\s+/)) {
+        return true;
+      }
+
+      // Format conversions
+      if (normalized.match(/^(format|parse)\s+(date|number|currency|time)/)) {
+        return true;
+      }
+
+      // Dictionary lookups
+      if (normalized.match(/^(lookup|find|get)\s+(word|term|definition)/)) {
+        return true;
+      }
+
+      // Code/identifier preservation (refract to atomic)
+      if (normalized.match(/^(refract|structure|parse)\s+(code|identifier|variable)/)) {
+        return true;
+      }
+
+      // Simple text operations
+      if (normalized.match(/^(count|length|split|join)\s+(words|characters|lines)/)) {
         return true;
       }
     }
 
-    // TODO: Add more heuristics for deterministic tasks
+    // Object with deterministic operation type
+    if (typeof input === 'object' && input !== null) {
+      const op = (input as any).operation || (input as any).op;
+      if (typeof op === 'string') {
+        const deterministicOps = [
+          'translate',
+          'refract',
+          'transmute',
+          'project',
+          'format',
+          'parse',
+          'transform',
+          'lookup',
+        ];
+        if (deterministicOps.includes(op.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+
     return false;
   }
 

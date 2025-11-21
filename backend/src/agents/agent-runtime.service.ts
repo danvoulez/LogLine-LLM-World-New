@@ -14,6 +14,7 @@ import { TdlnTService } from '../tdln-t/tdln-t.service';
 import { AgentNotFoundException } from '../common/exceptions/agent-not-found.exception';
 import { AgentExecutionException } from '../common/exceptions/agent-execution.exception';
 import { AgentInputValidatorService } from '../common/validators/agent-input-validator.service';
+import { BudgetTrackerService } from '../execution/budget-tracker.service';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { CoreMessage } from 'ai';
@@ -55,6 +56,7 @@ export class AgentRuntimeService {
     private atomicConverter: AtomicEventConverterService,
     private tdlnTService: TdlnTService,
     private agentInputValidator: AgentInputValidatorService,
+    private budgetTracker: BudgetTrackerService,
   ) {}
 
   async runAgentStep(
@@ -158,6 +160,17 @@ export class AgentRuntimeService {
       maxTokens: agent.model_profile.max_tokens,
     };
 
+    // Check budget before LLM call
+    const budgetCheck = await this.budgetTracker.checkBudget(context.runId);
+    if (budgetCheck.exceeded) {
+      throw new AgentExecutionException(
+        agentId,
+        `Budget exceeded: ${budgetCheck.reason}`,
+        new Error(`Budget limit reached: ${budgetCheck.reason}`),
+        { runId: context.runId, stepId: context.stepId },
+      );
+    }
+
     // Generate with tool calling (with retry and error handling)
     const result = await this.llmRouter.generateText(
       messages,
@@ -169,6 +182,17 @@ export class AgentRuntimeService {
         stepId: context.stepId,
       },
     );
+
+    // Track LLM call and estimate cost
+    this.budgetTracker.incrementLlmCalls(context.runId);
+    
+    // Estimate cost (rough approximation - can be improved with actual pricing API)
+    // AI SDK v5 returns usage in result.usage
+    const usage = (result as any).usage || { promptTokens: 0, completionTokens: 0 };
+    const estimatedCostCents = this.estimateLlmCost(llmConfig, usage);
+    if (estimatedCostCents > 0) {
+      this.budgetTracker.addCost(context.runId, estimatedCostCents);
+    }
 
     // Log LLM call as event
     await this.eventRepository.save({
@@ -182,6 +206,8 @@ export class AgentRuntimeService {
         prompt: messages,
         response: result.text,
         finishReason: result.finishReason,
+        usage: usage,
+        estimated_cost_cents: estimatedCostCents,
       },
     });
 
@@ -228,6 +254,41 @@ export class AgentRuntimeService {
       toolCalls,
       finishReason: result.finishReason,
     };
+  }
+
+  /**
+   * Estimate LLM cost in cents (rough approximation)
+   * TODO: Use actual pricing API for accurate costs
+   */
+  private estimateLlmCost(
+    config: LlmConfig,
+    usage?: { promptTokens?: number; completionTokens?: number },
+  ): number {
+    if (!usage) return 0;
+
+    // Rough pricing estimates (in cents per 1K tokens)
+    const pricing: Record<string, Record<string, { input: number; output: number }>> = {
+      openai: {
+        'gpt-4o': { input: 2.5, output: 10 }, // $0.025/$0.10 per 1K tokens
+        'gpt-4-turbo': { input: 10, output: 30 },
+        'gpt-3.5-turbo': { input: 0.5, output: 1.5 },
+      },
+      anthropic: {
+        'claude-3-5-sonnet': { input: 3, output: 15 },
+        'claude-3-opus': { input: 15, output: 75 },
+      },
+      google: {
+        'gemini-pro': { input: 0.5, output: 1.5 },
+      },
+    };
+
+    const modelPricing = pricing[config.provider]?.[config.model];
+    if (!modelPricing) return 0;
+
+    const inputCost = ((usage.promptTokens || 0) / 1000) * modelPricing.input;
+    const outputCost = ((usage.completionTokens || 0) / 1000) * modelPricing.output;
+
+    return Math.ceil(inputCost + outputCost);
   }
 
 

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RunsController } from './runs.controller';
 import { RunsService } from './runs.service';
 import { OrchestratorService } from '../execution/orchestrator.service';
+import { BudgetTrackerService } from '../execution/budget-tracker.service';
 import { Run } from './entities/run.entity';
 import { Step } from './entities/step.entity';
 import { Event } from './entities/event.entity';
@@ -17,8 +18,8 @@ import { ToolsModule } from '../tools/tools.module';
     ToolsModule,
   ],
   controllers: [RunsController],
-  providers: [RunsService, OrchestratorService],
-  exports: [RunsService, OrchestratorService],
+  providers: [RunsService, OrchestratorService, BudgetTrackerService],
+  exports: [RunsService, OrchestratorService, BudgetTrackerService],
 })
 export class RunsModule {}
 

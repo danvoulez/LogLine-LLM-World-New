@@ -9,6 +9,7 @@ import { AgentRuntimeService, AgentContext } from '../agents/agent-runtime.servi
 import { ContextSummarizerService } from '../agents/context-summarizer.service';
 import { AtomicEventConverterService } from '../agents/atomic-event-converter.service';
 import { ToolRuntimeService, ToolContext } from '../tools/tool-runtime.service';
+import { BudgetTrackerService } from './budget-tracker.service';
 
 @Injectable()
 export class OrchestratorService {
@@ -27,6 +28,7 @@ export class OrchestratorService {
     private toolRuntime: ToolRuntimeService,
     private contextSummarizer: ContextSummarizerService,
     private atomicConverter: AtomicEventConverterService,
+    private budgetTracker: BudgetTrackerService,
   ) {}
 
   async startRun(
@@ -58,9 +60,16 @@ export class OrchestratorService {
       status: RunStatus.PENDING,
       mode: mode as any,
       input,
+      // Budget fields can be set via input or defaults
+      cost_limit_cents: input.cost_limit_cents || null,
+      llm_calls_limit: input.llm_calls_limit || null,
+      latency_slo_ms: input.latency_slo_ms || null,
     });
 
     const savedRun = await this.runRepository.save(run);
+
+    // Initialize budget tracking
+    this.budgetTracker.initializeRun(savedRun.id);
 
     // Emit run_started event
     await this.eventRepository.save({
@@ -93,6 +102,12 @@ export class OrchestratorService {
     if (!run) return;
 
     try {
+      // Check budget before starting
+      const budgetCheck = await this.budgetTracker.checkBudget(runId);
+      if (budgetCheck.exceeded) {
+        throw new Error(`Budget exceeded: ${budgetCheck.reason}`);
+      }
+
       // Update run status to running
       run.status = RunStatus.RUNNING;
       await this.runRepository.save(run);
@@ -113,7 +128,15 @@ export class OrchestratorService {
 
       // Mark run as completed
       run.status = RunStatus.COMPLETED;
-      run.result = { message: 'Workflow completed successfully' };
+      const metrics = this.budgetTracker.getMetrics(runId);
+      run.result = {
+        message: 'Workflow completed successfully',
+        ...(metrics && {
+          cost_cents: metrics.costCents,
+          llm_calls: metrics.llmCalls,
+          duration_ms: Date.now() - metrics.startTime,
+        }),
+      };
       await this.runRepository.save(run);
 
       await this.eventRepository.save({
@@ -121,6 +144,9 @@ export class OrchestratorService {
         kind: EventKind.RUN_COMPLETED,
         payload: { result: run.result },
       });
+
+      // Cleanup budget tracking
+      this.budgetTracker.cleanup(runId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown workflow error';
@@ -155,6 +181,9 @@ export class OrchestratorService {
           workflow_id: workflow.id,
         },
       });
+
+      // Cleanup budget tracking
+      this.budgetTracker.cleanup(runId);
     }
   }
 
@@ -255,6 +284,26 @@ export class OrchestratorService {
     const routerAgentId = routerNode.config?.router_agent_id || 'agent.router';
     const routes = routerNode.config?.routes || [];
 
+    // Validate router configuration
+    if (!routes || routes.length === 0) {
+      this.logger.warn(
+        `Router node ${routerNode.id} has no routes defined, using first outgoing edge`,
+        { run_id: runId, node_id: routerNode.id },
+      );
+      return outgoingEdges[0]?.to || null;
+    }
+
+    // Validate routes have required fields
+    for (const route of routes) {
+      if (!route.id || !route.target_node) {
+        this.logger.error(
+          `Router node ${routerNode.id} has invalid route configuration`,
+          { run_id: runId, node_id: routerNode.id, route },
+        );
+        throw new Error(`Invalid route configuration in router node ${routerNode.id}`);
+      }
+    }
+
     // Build routing context for agent - dignified, clear, helpful
     // Use atomic format for better LLM understanding
     let atomicContextMessage = '';
@@ -345,13 +394,35 @@ Please respond with the route ID you think is most appropriate (e.g., "high_prio
       // Extract route ID from agent response
       const routeId = this.extractRouteId(result.text, routes);
 
+      // Log routing decision
+      this.logger.log(
+        `Router node ${routerNode.id} selected route: ${routeId}`,
+        { run_id: runId, node_id: routerNode.id, route_id: routeId, agent_response: result.text },
+      );
+
       // Find edge matching the route
       const selectedRoute = routes.find((r: any) => r.id === routeId);
       if (selectedRoute) {
+        // Log successful routing
+        await this.eventRepository.save({
+          run_id: runId,
+          kind: EventKind.POLICY_EVAL,
+          payload: {
+            type: 'router_decision',
+            node_id: routerNode.id,
+            route_id: routeId,
+            target_node: selectedRoute.target_node,
+            agent_response: result.text,
+          },
+        });
         return selectedRoute.target_node;
       }
 
-      // Fallback: use first route
+      // Fallback: use first route (log warning)
+      this.logger.warn(
+        `Router node ${routerNode.id} could not match route "${routeId}", using fallback`,
+        { run_id: runId, node_id: routerNode.id, route_id: routeId, available_routes: routes.map((r: any) => r.id) },
+      );
       if (routes.length > 0) {
         return routes[0].target_node;
       }
