@@ -1621,6 +1621,77 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 
 **See:** [PHASE4_COMPLETE.md](./PHASE4_COMPLETE.md)
 
+### Phase 5 – Registry Centralizado (📋 PLANNED)
+
+**Goal:** Criar um registry centralizado para descoberta e compartilhamento de apps, tools, agents e workflows.
+
+**Problema Identificado:**
+- ✅ Apps têm `visibility` (`private`, `org`, `public`)
+- ❌ **Falta Registry centralizado** para descoberta e compartilhamento
+- ❌ Não há como descobrir apps públicos
+- ❌ Não há como instalar apps de terceiros
+- ❌ Não há versionamento público de apps
+
+**Proposta:**
+
+1. **Registry de Apps:**
+   - Namespace público: `@owner/app-id` (ex: `@logline/ticket-triage`)
+   - Versionamento semântico: `1.0.0`, `1.1.0`, `2.0.0`
+   - Discovery: `GET /registry/apps?q=...&tags=...&owner=...`
+   - Publicar: `POST /registry/apps` (com manifest)
+   - Instalar: `POST /registry/apps/:namespace/install`
+   - Atualizar: `PATCH /registry/apps/:namespace/update`
+   - Reviews/Ratings: `POST /registry/apps/:namespace/reviews`
+
+2. **Schema:**
+   ```sql
+   CREATE TABLE registry_apps (
+     id              UUID PRIMARY KEY,
+     namespace       TEXT NOT NULL, -- '@owner/app-id'
+     version         TEXT NOT NULL, -- '1.0.0'
+     app_id          VARCHAR(255) NOT NULL,
+     manifest        JSONB NOT NULL,
+     owner_id       UUID NOT NULL,
+     visibility      TEXT NOT NULL DEFAULT 'public',
+     downloads       INTEGER NOT NULL DEFAULT 0,
+     rating          DECIMAL(3,2),
+     rating_count    INTEGER NOT NULL DEFAULT 0,
+     tags            TEXT[],
+     dependencies    JSONB,
+     UNIQUE(namespace, version)
+   );
+   
+   CREATE TABLE registry_reviews (...);
+   CREATE TABLE registry_installations (...);
+   ```
+
+3. **Endpoints:**
+   - `GET /registry/apps` - Discovery (busca, filtros, ordenação)
+   - `GET /registry/apps/:namespace` - Obter app específico
+   - `POST /registry/apps` - Publicar app
+   - `POST /registry/apps/:namespace/install` - Instalar app
+   - `PATCH /registry/apps/:namespace/update` - Atualizar app instalado
+   - `DELETE /registry/apps/:namespace/uninstall` - Desinstalar
+   - `POST /registry/apps/:namespace/reviews` - Criar review
+   - `GET /registry/apps/:namespace/reviews` - Listar reviews
+
+4. **Futuro:**
+   - Registry de Tools (`GET /registry/tools`)
+   - Registry de Agents (`GET /registry/agents`)
+   - Registry de Workflows (`GET /registry/workflows`)
+   - Marketplace UI
+
+**Done when:**
+- Apps podem ser publicados no registry público
+- Apps podem ser descobertos via busca/filtros
+- Apps podem ser instalados em qualquer tenant
+- Versionamento e dependências funcionam
+- Reviews/ratings estão disponíveis
+
+**Status:** 📋 **PLANNED** - Proposta completa em [REGISTRY_PROPOSAL.md](./docs/design/REGISTRY_PROPOSAL.md)
+
+**See:** [REGISTRY_PROPOSAL.md](./docs/design/REGISTRY_PROPOSAL.md)
+
 ---
 
 ## 12. How to Extend the Platform Safely
@@ -1692,6 +1763,10 @@ You can onboard a new app, constrain what it can touch (tools/memory), have diff
 - [Mobile iPhone Architecture](./docs/architecture/MOBILE_IPHONE_ARCHITECTURE.md) - Mobile-first architecture
 - [Agent UI Architecture](./docs/architecture/AGENT_UI_ARCHITECTURE.md) - Agent UI architecture
 - [File Operations Architecture](./docs/architecture/FILE_OPERATIONS_ARCHITECTURE.md) - File operations design
+
+### Registry & Marketplace
+
+- [Registry Proposal](./docs/design/REGISTRY_PROPOSAL.md) - Centralized registry for apps, tools, agents, and workflows
 
 ### External Resources
 
