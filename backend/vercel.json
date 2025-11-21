@@ -4,12 +4,11 @@
   "installCommand": "npm install",
   "framework": null,
   "outputDirectory": "dist",
-  "builds": [
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
@@ -18,11 +17,6 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  },
-  "git": {
-    "deploymentEnabled": {
-      "main": true
-    }
   }
 }
 
