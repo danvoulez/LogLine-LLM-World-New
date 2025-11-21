@@ -56,11 +56,61 @@ export class AppController {
   async renderLayout(@Body() body: { prompt: string }): Promise<{ layout: any }> {
     const { prompt } = body;
 
+    // Check for specific intents
+    const lowerPrompt = prompt.toLowerCase();
+    
+    if (lowerPrompt.includes('contract') || lowerPrompt.includes('contrato') || lowerPrompt.includes('registry')) {
+      return { layout: this.generateRegistryContractsLayout() };
+    }
+
     // TODO: Use TDLN-T to structure the prompt, then LLM to generate layout
     // For now, return mock layout based on keywords
     const layout = this.generateMockLayout(prompt);
 
     return { layout };
+  }
+
+  private generateRegistryContractsLayout(): any {
+    return {
+      view_id: 'registry_contracts_001',
+      title: 'Registry: Active Contracts',
+      layout_type: 'dashboard',
+      components: [
+        {
+          id: 'stats_row',
+          type: 'Card',
+          props: { className: 'grid grid-cols-3 gap-4 bg-transparent border-none shadow-none p-0 mb-6' },
+          children: [
+            { id: 's1', type: 'Metric', props: { label: 'Total Value', value: 'R$ 1.5M', trend: 'up', trendValue: '+12%' } },
+            { id: 's2', type: 'Metric', props: { label: 'Active Agents', value: '8', trend: 'neutral', trendValue: 'Stable' } },
+            { id: 's3', type: 'Metric', props: { label: 'Pending Signatures', value: '3', trend: 'down', trendValue: '-1' } },
+          ],
+        },
+        {
+          id: 'contract_list',
+          type: 'Card',
+          props: { title: 'Executed Agreements (Ledger)' },
+          children: [
+            {
+              id: 'table_1',
+              type: 'Table',
+              props: {
+                columns: [
+                  { key: 'id', header: 'Contract ID' },
+                  { key: 'title', header: 'Title', width: '40%' },
+                  { key: 'parties', header: 'Parties' },
+                  { key: 'status', header: 'Status' },
+                ],
+                data: [
+                  { id: 'CTR-2024-88', title: 'Software Dev Services', parties: 'Acme <> DevBot-Alpha', status: 'VIGENTE' },
+                  { id: 'CTR-2024-92', title: 'Cloud Infrastructure', parties: 'Acme <> InfraAgent', status: 'RASCUNHO' },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
   }
 
   private generateMockLayout(prompt: string): any {

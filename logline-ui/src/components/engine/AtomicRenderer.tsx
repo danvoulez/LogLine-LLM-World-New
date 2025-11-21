@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { SafeCard } from "../safe/SafeCard";
 import { SafeMetric } from "../safe/SafeMetric";
 import { TraceRibbon } from "../safe/TraceRibbon";
+import { SafeTable } from "../safe/SafeTable";
 import { AtomicComponent } from "@/types/atomic";
 
 // 1. The Registry of Safe Components
@@ -11,7 +12,8 @@ const COMPONENT_REGISTRY: Record<string, any> = {
   Card: SafeCard,
   Metric: SafeMetric,
   TraceRibbon: TraceRibbon,
-  // Add more here (Charts, Tables, etc.)
+  Table: SafeTable,
+  // Add more here (Charts, Forms, etc.)
 };
 
 export function AtomicRenderer({ component }: { component: AtomicComponent }) {
