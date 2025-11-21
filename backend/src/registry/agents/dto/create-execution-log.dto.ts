@@ -6,7 +6,7 @@ import {
   IsArray,
   IsDateString,
 } from 'class-validator';
-import { ExecutionStatus } from '../entities/agent-execution-log.entity';
+import type { ExecutionStatus } from '../entities/agent-execution-log.entity';
 
 export class CreateExecutionLogDto {
   @IsString()
