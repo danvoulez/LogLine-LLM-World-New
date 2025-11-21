@@ -11,7 +11,7 @@
 
 **New to the project?** Start here:
 1. **[../README.md](../README.md)** - Project overview and setup
-2. **[../MASTER_BLUEPRINT.md](../MASTER_BLUEPRINT.md)** - Complete system specification
+2. **[MASTER_BLUEPRINT.md](./MASTER_BLUEPRINT.md)** - Complete system specification
 3. **[guides/GETTING_STARTED.md](./guides/GETTING_STARTED.md)** - Development setup guide
 
 ---
