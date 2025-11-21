@@ -5,6 +5,7 @@ import { AtomicRenderer } from "@/components/engine/AtomicRenderer";
 import { fetchLayoutForIntent } from "@/lib/api/client";
 import { UILayout } from "@/types/atomic";
 import { OmniBar } from "@/components/safe/OmniBar";
+import { RegisterSW } from "@/app/register-sw";
 
 export default function AgentOS() {
   const [layout, setLayout] = useState<UILayout | null>(null);
@@ -85,6 +86,8 @@ export default function AgentOS() {
       {/* THE FLOATING BRAIN */}
       <OmniBar onSubmit={handleExecute} isThinking={loading} />
 
+      {/* Register Service Worker */}
+      <RegisterSW />
     </main>
   );
 }
