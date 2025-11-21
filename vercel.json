@@ -4,15 +4,10 @@
   "installCommand": "cd backend && npm install",
   "framework": null,
   "outputDirectory": "backend/dist",
-  "functions": {
-    "backend/api/index.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "backend/api/index.ts"
+      "dest": "/backend/api/index.ts"
     }
   ],
   "env": {
