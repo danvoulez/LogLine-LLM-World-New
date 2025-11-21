@@ -74,19 +74,19 @@ export class AppController {
     }
     
     if (lowerPrompt.includes('people') || lowerPrompt.includes('pessoas') || lowerPrompt.includes('person')) {
-      return { layout: this.generateRegistryPeopleLayout() };
+      return { layout: await this.generateRegistryPeopleLayout() };
     }
     
     if (lowerPrompt.includes('object') || lowerPrompt.includes('objeto') || lowerPrompt.includes('item')) {
-      return { layout: this.generateRegistryObjectsLayout() };
+      return { layout: await this.generateRegistryObjectsLayout() };
     }
     
     if (lowerPrompt.includes('idea') || lowerPrompt.includes('ideia') || lowerPrompt.includes('proposal')) {
-      return { layout: this.generateRegistryIdeasLayout() };
+      return { layout: await this.generateRegistryIdeasLayout() };
     }
     
     if (lowerPrompt.includes('agent') || lowerPrompt.includes('agente')) {
-      return { layout: this.generateAgentsLayout() };
+      return { layout: await this.generateAgentsLayout() };
     }
 
     // TODO: Use TDLN-T to structure the prompt, then LLM to generate layout
@@ -175,7 +175,7 @@ export class AppController {
     };
   }
 
-  private generateRegistryPeopleLayout(): any {
+  private async generateRegistryPeopleLayout(): Promise<any> {
     return {
       view_id: 'registry_people_001',
       title: 'Registry: People',
@@ -222,7 +222,7 @@ export class AppController {
     };
   }
 
-  private generateRegistryObjectsLayout(): any {
+  private async generateRegistryObjectsLayout(): Promise<any> {
     return {
       view_id: 'registry_objects_001',
       title: 'Registry: Objects',
@@ -291,7 +291,7 @@ export class AppController {
     };
   }
 
-  private generateRegistryIdeasLayout(): any {
+  private async generateRegistryIdeasLayout(): Promise<any> {
     return {
       view_id: 'registry_ideas_001',
       title: 'Registry: Ideas',
@@ -359,7 +359,7 @@ export class AppController {
     };
   }
 
-  private generateAgentsLayout(): any {
+  private async generateAgentsLayout(): Promise<any> {
     return {
       view_id: 'agents_001',
       title: 'Agents Dashboard',
